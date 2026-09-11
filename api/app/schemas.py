@@ -201,6 +201,66 @@ class JobOut(BaseModel):
     message: Optional[str] = None
     error_message: Optional[str] = None
     context_address: Optional[int] = None
+    stop_requested: bool = False
 
     class Config:
         from_attributes = True
+
+
+class StartDynamicRequest(BaseModel):
+    bundle_id: Optional[str] = None
+    classes: list[str] = []
+    trace_network: bool = True
+    trace_crypto: bool = True
+    duration_secs: int = 30
+
+
+class DynamicRunConfigOut(BaseModel):
+    bundle_id: Optional[str] = None
+    classes: list[str] = []
+    trace_network: bool = True
+    trace_crypto: bool = True
+    duration_secs: int = 30
+
+
+class DynamicRunOut(BaseModel):
+    id: str
+    ipa_id: str
+    status: str
+    progress_pct: int
+    message: Optional[str] = None
+    error_message: Optional[str] = None
+    stop_requested: bool = False
+    started_at: Optional[datetime] = None
+    finished_at: Optional[datetime] = None
+    config: Optional[DynamicRunConfigOut] = None
+
+    class Config:
+        from_attributes = True
+
+
+class DynamicTraceOut(BaseModel):
+    seq: int
+    ts_offset_ms: int
+    category: str
+    summary: str
+    detail: Any
+
+    class Config:
+        from_attributes = True
+
+
+class DynamicEventIn(BaseModel):
+    ts_offset_ms: int
+    category: str
+    summary: str
+    detail: Any = None
+
+
+class DynamicEventsBatchIn(BaseModel):
+    events: list[DynamicEventIn]
+
+
+class DynamicCompletePayload(BaseModel):
+    success: bool
+    error_message: Optional[str] = None

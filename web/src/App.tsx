@@ -33,8 +33,9 @@ import FunctionBrowser from "./components/FunctionBrowser";
 import DisassemblyView from "./components/DisassemblyView";
 import McpDocsPage from "./components/McpDocsPage";
 import ComparePage from "./components/ComparePage";
+import DynamicPage from "./components/DynamicPage";
 
-type WorkspaceTab = "files" | "classes" | "functions";
+type WorkspaceTab = "files" | "classes" | "functions" | "dynamic";
 
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -421,6 +422,9 @@ export default function App() {
                 <button className={`tab-btn ${tab === "functions" ? "active" : ""}`} onClick={() => setTab("functions")}>
                   Functions {functions.length > 0 && <span className="tab-count">{functions.length}</span>}
                 </button>
+                <button className={`tab-btn ${tab === "dynamic" ? "active" : ""}`} onClick={() => setTab("dynamic")}>
+                  🧬 Dynamic
+                </button>
               </div>
 
               {tab === "files" && (
@@ -525,6 +529,16 @@ export default function App() {
                     )}
                   </div>
                 </div>
+              )}
+
+              {tab === "dynamic" && selectedIpaId && (
+                <DynamicPage
+                  ipaId={selectedIpaId}
+                  classes={classes}
+                  bundleIdGuess={
+                    (infoPlist?.parsed as { CFBundleIdentifier?: string } | undefined)?.CFBundleIdentifier ?? null
+                  }
+                />
               )}
             </>
           )}

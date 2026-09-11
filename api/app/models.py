@@ -30,6 +30,7 @@ class IPA(Base):
     objc_classes = relationship("ObjCClass", cascade="all, delete-orphan")
     symbols = relationship("SymbolEntry", cascade="all, delete-orphan")
     disasm_results = relationship("DisasmResult", cascade="all, delete-orphan")
+    dynamic_traces = relationship("DynamicTrace", cascade="all, delete-orphan")
 
 
 class FileTreeNode(Base):
@@ -106,5 +107,20 @@ class Job(Base):
     error_message = Column(Text, nullable=True)
     started_at = Column(DateTime, nullable=True)
     finished_at = Column(DateTime, nullable=True)
+    dynamic_config_json = Column(Text, nullable=True)  # request params, for phase="dynamic" jobs
+    stop_requested = Column(Boolean, default=False)  # set by the user; polled by frida-bridge
 
     ipa = relationship("IPA", back_populates="jobs")
+
+
+class DynamicTrace(Base):
+    __tablename__ = "dynamic_traces"
+
+    id = Column(String, primary_key=True, default=gen_id)
+    ipa_id = Column(String, ForeignKey("ipas.id"), nullable=False)
+    job_id = Column(String, ForeignKey("jobs.id"), nullable=False)
+    seq = Column(Integer, nullable=False)  # ordering within a run
+    ts_offset_ms = Column(Integer, nullable=False)  # ms since run start
+    category = Column(String, nullable=False)  # objc_call | network | keychain | crypto | lifecycle | error
+    summary = Column(String, nullable=False)  # one-line label for the list view
+    detail_json = Column(Text, nullable=False)  # category-specific structured detail

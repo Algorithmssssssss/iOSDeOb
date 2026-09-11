@@ -44,6 +44,7 @@ export interface Job {
   message?: string | null;
   error_message?: string | null;
   context_address?: number | null;
+  stop_requested?: boolean;
 }
 
 export interface ObjCMethod {
@@ -288,6 +289,69 @@ export interface CompareResult {
 
 export async function compareScans(aId: string, bId: string): Promise<CompareResult> {
   return json(await fetch(`${API_BASE}/compare?a=${encodeURIComponent(aId)}&b=${encodeURIComponent(bId)}`));
+}
+
+export interface DynamicRunConfig {
+  bundle_id?: string | null;
+  classes: string[];
+  trace_network: boolean;
+  trace_crypto: boolean;
+  duration_secs: number;
+}
+
+export interface DynamicRun {
+  id: string;
+  ipa_id: string;
+  status: string;
+  progress_pct: number;
+  message?: string | null;
+  error_message?: string | null;
+  stop_requested: boolean;
+  started_at?: string | null;
+  finished_at?: string | null;
+  config?: DynamicRunConfig | null;
+}
+
+export interface DynamicTraceEvent {
+  seq: number;
+  ts_offset_ms: number;
+  category: string;
+  summary: string;
+  detail: unknown;
+}
+
+export interface StartDynamicRequest {
+  bundle_id?: string;
+  classes: string[];
+  trace_network: boolean;
+  trace_crypto: boolean;
+  duration_secs: number;
+}
+
+export async function startDynamicTrace(ipaId: string, body: StartDynamicRequest): Promise<DynamicRun> {
+  return json(
+    await fetch(`${API_BASE}/ipas/${ipaId}/dynamic/start`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    })
+  );
+}
+
+export async function stopJob(jobId: string): Promise<DynamicRun> {
+  return json(await fetch(`${API_BASE}/jobs/${jobId}/stop`, { method: "POST" }));
+}
+
+export async function listDynamicRuns(ipaId: string): Promise<DynamicRun[]> {
+  return json(await fetch(`${API_BASE}/ipas/${ipaId}/dynamic/runs`));
+}
+
+export async function listDynamicEvents(
+  ipaId: string,
+  jobId: string,
+  afterSeq: number = 0
+): Promise<DynamicTraceEvent[]> {
+  return json(await fetch(`${API_BASE}/ipas/${ipaId}/dynamic/runs/${jobId}/events?after_seq=${afterSeq}`));
 }
 
 export function jobSocketUrl(jobId: string): string {

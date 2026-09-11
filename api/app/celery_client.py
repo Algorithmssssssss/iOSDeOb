@@ -27,3 +27,12 @@ def enqueue_cleanup_binary(ipa_id: str) -> str:
         args=[ipa_id],
     )
     return result.id
+
+
+def enqueue_dynamic_trace(ipa_id: str, job_id: str, params: dict) -> str:
+    result = celery_client.send_task(
+        "bridge.tasks.run_dynamic_trace",
+        args=[ipa_id, job_id, params],
+        queue="frida",
+    )
+    return result.id
