@@ -1,0 +1,10 @@
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+sqlalchemy==2.0.35
+pydantic==2.9.2
+celery==5.4.0
+redis==5.0.8
+python-multipart==0.0.12
+websockets==13.1
+Pillow==10.4.0
+numpy==2.1.1

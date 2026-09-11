@@ -1,0 +1,701 @@
+<title>iOSDeOb MCP</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Source+Sans+3:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+  :root {
+    --bg: #f6f7fb;
+    --surface: #ffffff;
+    --sunken: #eef0f6;
+    --border: #dde1ea;
+    --text: #1a1d29;
+    --muted: #5b6172;
+    --accent: #3f63e0;
+    --accent-soft: #eaefff;
+    --teal: #0f8b8d;
+    --teal-soft: #e3f6f6;
+    --amber: #a8710a;
+    --amber-soft: #fbf0dc;
+    --term-bg: #0d0f16;
+    --term-text: #e7e9f3;
+    --term-muted: #8489a0;
+    --term-accent: #7dd3fc;
+    --term-border: #262b3a;
+    --shadow: 0 1px 2px rgba(20, 24, 40, 0.04), 0 8px 24px rgba(20, 24, 40, 0.06);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #10121a;
+      --surface: #171a24;
+      --sunken: #0b0d13;
+      --border: #262b3a;
+      --text: #e7e9f3;
+      --muted: #8b90a3;
+      --accent: #6d8dff;
+      --accent-soft: rgba(109, 141, 255, 0.14);
+      --teal: #4fd1cf;
+      --teal-soft: rgba(79, 209, 207, 0.12);
+      --amber: #e0b34d;
+      --amber-soft: rgba(224, 179, 77, 0.12);
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 10px 30px rgba(0, 0, 0, 0.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #10121a;
+    --surface: #171a24;
+    --sunken: #0b0d13;
+    --border: #262b3a;
+    --text: #e7e9f3;
+    --muted: #8b90a3;
+    --accent: #6d8dff;
+    --accent-soft: rgba(109, 141, 255, 0.14);
+    --teal: #4fd1cf;
+    --teal-soft: rgba(79, 209, 207, 0.12);
+    --amber: #e0b34d;
+    --amber-soft: rgba(224, 179, 77, 0.12);
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 10px 30px rgba(0, 0, 0, 0.35);
+  }
+
+  * { box-sizing: border-box; }
+  html { color-scheme: light dark; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Source Sans 3", -apple-system, sans-serif;
+    font-size: 16px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1, h2, h3 { font-family: "IBM Plex Sans", sans-serif; text-wrap: balance; margin: 0; }
+  code, pre, .mono { font-family: "IBM Plex Mono", "SF Mono", monospace; }
+  a { color: var(--accent); }
+  p { max-width: 66ch; color: var(--text); }
+  p.muted, span.muted, li.muted { color: var(--muted); }
+
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 24px;
+    background: color-mix(in srgb, var(--bg) 88%, transparent);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--border);
+  }
+  .topbar .mark {
+    width: 26px; height: 26px; border-radius: 7px;
+    background: linear-gradient(135deg, var(--accent), var(--teal));
+    flex-shrink: 0;
+  }
+  .topbar .name { font-weight: 600; font-size: 0.95rem; letter-spacing: -0.01em; }
+  .topbar .tagline { color: var(--muted); font-size: 0.82rem; }
+
+  .shell {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 0 24px 96px;
+    display: grid;
+    grid-template-columns: 208px minmax(0, 1fr);
+    gap: 56px;
+  }
+
+  nav.toc {
+    position: sticky;
+    top: 68px;
+    align-self: start;
+    padding-top: 40px;
+    font-size: 0.86rem;
+  }
+  nav.toc .toc-label {
+    font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.09em;
+    color: var(--muted); margin-bottom: 10px; font-weight: 600;
+  }
+  nav.toc a {
+    display: block;
+    color: var(--muted);
+    text-decoration: none;
+    padding: 5px 0;
+    border-left: 2px solid transparent;
+    padding-left: 10px;
+    margin-left: -11px;
+  }
+  nav.toc a:hover { color: var(--text); }
+
+  main { min-width: 0; padding-top: 40px; }
+  section { padding-top: 64px; scroll-margin-top: 76px; }
+  section:first-of-type { padding-top: 0; }
+
+  .eyebrow {
+    font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.09em;
+    color: var(--accent); font-weight: 600; margin-bottom: 10px; display: block;
+  }
+  h2 { font-size: 1.5rem; font-weight: 600; letter-spacing: -0.01em; margin-bottom: 14px; }
+  h3 { font-size: 1.02rem; font-weight: 600; margin-bottom: 6px; }
+
+  .hero { padding-top: 8px; padding-bottom: 8px; }
+  .hero h1 { font-size: clamp(1.9rem, 3.4vw, 2.5rem); font-weight: 700; margin-bottom: 14px; }
+  .hero p.lede { font-size: 1.08rem; color: var(--muted); max-width: 58ch; }
+  .hero .meta-row {
+    display: flex; gap: 10px; flex-wrap: wrap; margin-top: 22px;
+  }
+  .chip {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.76rem;
+    padding: 5px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--muted);
+  }
+
+  /* architecture flow */
+  .flow {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    margin: 28px 0 8px;
+    flex-wrap: wrap;
+  }
+  .flow-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    box-shadow: var(--shadow);
+    flex: 1;
+    min-width: 150px;
+  }
+  .flow-box .k { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); display: block; margin-bottom: 4px; }
+  .flow-box .v { font-size: 0.88rem; font-weight: 600; font-family: "IBM Plex Mono", monospace; }
+  .flow-box .v.accent { color: var(--accent); }
+  .flow-box .v.teal { color: var(--teal); }
+  .flow-arrow {
+    color: var(--muted);
+    font-size: 1.3rem;
+    padding: 0 10px;
+    flex-shrink: 0;
+  }
+  @media (max-width: 720px) {
+    .flow { flex-direction: column; align-items: stretch; }
+    .flow-arrow { transform: rotate(90deg); align-self: center; padding: 4px 0; }
+    .flow-box { width: 100%; }
+  }
+
+  .callout {
+    border: 1px solid var(--border);
+    background: var(--sunken);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin: 18px 0;
+    font-size: 0.92rem;
+    color: var(--muted);
+  }
+  .callout strong { color: var(--text); }
+  .callout.amber { background: var(--amber-soft); border-color: color-mix(in srgb, var(--amber) 35%, var(--border)); }
+  .callout.amber strong { color: var(--amber); }
+
+  /* prerequisites checklist */
+  .checklist { list-style: none; margin: 16px 0; padding: 0; display: grid; gap: 10px; }
+  .checklist li {
+    display: flex; gap: 10px; align-items: flex-start;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 12px 14px; box-shadow: var(--shadow);
+  }
+  .checklist .num {
+    flex-shrink: 0; width: 22px; height: 22px; border-radius: 6px;
+    background: var(--accent-soft); color: var(--accent);
+    font-family: "IBM Plex Mono", monospace; font-size: 0.75rem; font-weight: 600;
+    display: flex; align-items: center; justify-content: center; margin-top: 1px;
+  }
+
+  /* code blocks */
+  .code-wrap { position: relative; margin: 14px 0; }
+  pre.code {
+    background: var(--term-bg);
+    color: var(--term-text);
+    border: 1px solid var(--term-border);
+    border-radius: 10px;
+    padding: 16px 18px;
+    overflow-x: auto;
+    font-size: 0.84rem;
+    line-height: 1.55;
+    margin: 0;
+  }
+  pre.code .c1 { color: var(--term-muted); }
+  pre.code .k { color: var(--term-accent); }
+  .copy-btn {
+    position: absolute; top: 10px; right: 10px;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.7rem;
+    background: rgba(255,255,255,0.06);
+    color: var(--term-muted);
+    border: 1px solid var(--term-border);
+    border-radius: 6px;
+    padding: 4px 9px;
+    cursor: pointer;
+  }
+  .copy-btn:hover { color: var(--term-text); border-color: var(--term-muted); }
+  .file-tag {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.74rem;
+    color: var(--muted);
+    margin-bottom: 6px;
+    display: block;
+  }
+
+  /* tool reference */
+  .tool-group { margin-bottom: 28px; }
+  .tool-group-title {
+    font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--muted); font-weight: 600; margin-bottom: 10px;
+  }
+  .tool {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface);
+    padding: 14px 16px;
+    margin-bottom: 8px;
+    box-shadow: var(--shadow);
+  }
+  .tool-sig {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.86rem;
+    color: var(--text);
+    display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
+  }
+  .tool-sig .args { color: var(--muted); font-size: 0.82rem; }
+  .tool-tag {
+    font-size: 0.64rem; text-transform: uppercase; letter-spacing: 0.05em;
+    padding: 2px 7px; border-radius: 5px; font-weight: 600; flex-shrink: 0;
+  }
+  .tool-tag.read { background: var(--accent-soft); color: var(--accent); }
+  .tool-tag.write { background: var(--amber-soft); color: var(--amber); }
+  .tool-tag.compute { background: var(--teal-soft); color: var(--teal); }
+  .tool-desc { font-size: 0.88rem; color: var(--muted); margin-top: 6px; max-width: 62ch; }
+
+  /* client setup cards */
+  .client-card {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--surface);
+    padding: 22px 24px;
+    margin-bottom: 20px;
+    box-shadow: var(--shadow);
+  }
+  .client-card h3 { font-size: 1.08rem; display: flex; align-items: center; gap: 10px; }
+  .client-icon {
+    width: 22px; height: 22px; border-radius: 6px; flex-shrink: 0;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 0.7rem; font-weight: 700; color: white;
+  }
+  .steps { list-style: none; margin: 14px 0 0; padding: 0; counter-reset: step; }
+  .steps > li {
+    counter-increment: step;
+    position: relative;
+    padding-left: 34px;
+    margin-bottom: 16px;
+  }
+  .steps > li::before {
+    content: counter(step);
+    position: absolute; left: 0; top: 1px;
+    width: 22px; height: 22px; border-radius: 50%;
+    background: var(--sunken); border: 1px solid var(--border);
+    color: var(--muted); font-family: "IBM Plex Mono", monospace;
+    font-size: 0.72rem; font-weight: 600;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .steps > li:last-child { margin-bottom: 0; }
+  .steps strong { display: block; margin-bottom: 4px; font-size: 0.93rem; }
+
+  /* example prompts */
+  .prompt-list { display: grid; gap: 10px; margin: 16px 0; }
+  .prompt {
+    background: var(--sunken);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 15px;
+    font-size: 0.9rem;
+    font-style: italic;
+    color: var(--text);
+  }
+  .prompt::before { content: "“"; color: var(--accent); font-style: normal; }
+  .prompt::after { content: "”"; color: var(--accent); font-style: normal; }
+
+  /* troubleshooting */
+  .qa { border-top: 1px solid var(--border); padding: 16px 0; }
+  .qa:first-child { border-top: none; padding-top: 0; }
+  .qa .q { font-weight: 600; font-size: 0.94rem; margin-bottom: 6px; }
+  .qa .a { color: var(--muted); font-size: 0.9rem; max-width: 62ch; }
+
+  .divider { height: 1px; background: var(--border); margin: 12px 0; }
+
+  footer {
+    max-width: 1180px; margin: 0 auto; padding: 32px 24px 60px;
+    color: var(--muted); font-size: 0.82rem;
+    border-top: 1px solid var(--border);
+  }
+
+  @media (max-width: 900px) {
+    .shell { grid-template-columns: 1fr; gap: 0; }
+    nav.toc {
+      position: sticky; top: 53px; padding-top: 12px; padding-bottom: 12px;
+      display: flex; gap: 4px; overflow-x: auto; white-space: nowrap;
+      background: var(--bg); border-bottom: 1px solid var(--border);
+      margin-bottom: 24px;
+    }
+    nav.toc .toc-label { display: none; }
+    nav.toc a { border-left: none; padding: 6px 10px; margin-left: 0; border-radius: 999px; background: var(--surface); border: 1px solid var(--border); }
+    main { padding-top: 20px; }
+  }
+</style>
+
+<div class="topbar">
+  <div class="mark"></div>
+  <div>
+    <div class="name">iOSDeOb MCP</div>
+  </div>
+  <span class="tagline" style="margin-left:auto;">Setup reference</span>
+</div>
+
+<div class="shell">
+  <nav class="toc">
+    <span class="toc-label">On this page</span>
+    <a href="#architecture">How it fits together</a>
+    <a href="#prerequisites">Prerequisites</a>
+    <a href="#tools">Tool reference</a>
+    <a href="#setup-desktop">Claude Desktop</a>
+    <a href="#setup-code">Claude Code</a>
+    <a href="#setup-other">Other MCP clients</a>
+    <a href="#examples">Example prompts</a>
+    <a href="#troubleshooting">Troubleshooting</a>
+    <a href="#security">Scope &amp; security</a>
+  </nav>
+
+  <main>
+    <section class="hero" id="top">
+      <span class="eyebrow">iOSDeOb · Model Context Protocol</span>
+      <h1>Let an AI agent read your decompiled code</h1>
+      <p class="lede">
+        The iOSDeOb MCP server exposes your local static-analysis stack — file tree,
+        Objective-C classes, and on-demand Ghidra decompilation — as eleven tools any
+        MCP-compatible agent can call. Upload an <span class="mono">.ipa</span>, then
+        ask it what the app actually does.
+      </p>
+      <div class="meta-row">
+        <span class="chip">11 tools</span>
+        <span class="chip">stdio transport</span>
+        <span class="chip">talks to localhost:8080</span>
+        <span class="chip">no auth · local only</span>
+      </div>
+    </section>
+
+    <section id="architecture">
+      <h2>How it fits together</h2>
+      <p class="muted">
+        The MCP server is a plain Python process that runs on your Mac — not inside
+        Docker. Your AI client launches it over stdio, and it makes the same HTTP
+        calls to the API that your browser makes when you use the web UI.
+      </p>
+      <div class="flow">
+        <div class="flow-box">
+          <span class="k">Your AI client</span>
+          <span class="v">Claude Desktop / Code / Cursor…</span>
+        </div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box">
+          <span class="k">stdio subprocess</span>
+          <span class="v accent">mcp-server/server.py</span>
+        </div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box">
+          <span class="k">HTTP · localhost:8080</span>
+          <span class="v teal">iOSDeOb API</span>
+        </div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box">
+          <span class="k">Docker Compose stack</span>
+          <span class="v">worker · radare2 · Ghidra</span>
+        </div>
+      </div>
+      <p class="muted" style="margin-top:16px;">
+        Nothing about the analysis stack changes to support this — the MCP server is
+        just a new front door onto the same REST API the web UI already uses.
+      </p>
+    </section>
+
+    <section id="prerequisites">
+      <h2>Prerequisites</h2>
+      <ul class="checklist">
+        <li>
+          <span class="num">1</span>
+          <div>
+            <strong>The Docker stack is running.</strong> From the project root:
+            <div class="code-wrap">
+              <pre class="code">docker compose up -d</pre>
+            </div>
+            Confirm it's up: <span class="mono">curl http://localhost:8080/api/health</span> should return <span class="mono">{"status":"ok"}</span>.
+          </div>
+        </li>
+        <li>
+          <span class="num">2</span>
+          <div>
+            <strong>The MCP server's virtualenv exists.</strong> It's already set up at
+            <span class="mono">mcp-server/.venv</span>. If you ever need to recreate it:
+            <div class="code-wrap">
+              <pre class="code">cd mcp-server
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt</pre>
+            </div>
+          </div>
+        </li>
+      </ul>
+      <div class="callout">
+        <strong>Note the two absolute paths</strong> you'll paste into every client below —
+        they don't change between clients:
+        <div class="code-wrap" style="margin-top:10px;">
+          <pre class="code"><span class="c1"># command</span>
+/Users/reachkim/Documents/Codes/iOSDeOb/mcp-server/.venv/bin/python
+<span class="c1"># args[0]</span>
+/Users/reachkim/Documents/Codes/iOSDeOb/mcp-server/server.py</pre>
+        </div>
+      </div>
+    </section>
+
+    <section id="tools">
+      <h2>Tool reference</h2>
+      <p class="muted">
+        Every tool talks to the scan by <span class="mono">ipa_id</span> (returned from
+        <span class="mono">upload_ipa</span> or <span class="mono">list_scans</span>).
+        Search tools are paginated — a query always returns a capped, summarized page,
+        never the whole binary's data at once.
+      </p>
+
+      <div class="tool-group">
+        <div class="tool-group-title">Scans</div>
+        <div class="tool">
+          <div class="tool-sig"><span class="tool-tag write">writes</span> upload_ipa<span class="args">(file_path, wait=true, timeout_seconds=300)</span></div>
+          <div class="tool-desc">Uploads a local .ipa and blocks until extraction finishes (or fails/times out), returning the scan record.</div>
+        </div>
+        <div class="tool">
+          <div class="tool-sig"><span class="tool-tag read">reads</span> list_scans<span class="args">()</span></div>
+          <div class="tool-desc">Every .ipa previously uploaded, most recent first.</div>
+        </div>
+        <div class="tool">
+          <div class="tool-sig"><span class="tool-tag read">reads</span> get_scan_info<span class="args">(ipa_id)</span></div>
+          <div class="tool-desc">Status plus the full extraction/disassembly job history.</div>
+        </div>
+      </div>
+
+      <div class="tool-group">
+        <div class="tool-group-title">Bundle contents</div>
+        <div class="tool">
+          <div class="tool-sig"><span class="tool-tag read">reads</span> list_files<span class="args">(ipa_id, query?, limit=50)</span></div>
+          <div class="tool-desc">Search the unzipped bundle by filename/path substring — Info.plist, storyboards, embedded frameworks.</div>
+        </div>
+        <div class="tool">
+          <div class="tool-sig"><span class="tool-tag read">reads</span> read_file<span class="args">(ipa_id, path)</span></div>
+          <div class="tool-desc">Text and plists come back in full; large/binary files as a hex preview + metadata. Image bytes are never returned.</div>
+        </div>
+        <div class="tool">
+          <div class="tool-sig"><span class="tool-tag read">reads</span> get_info_plist<span class="args">(ipa_id)</span></div>
+          <div class="tool-desc">Parsed Info.plist — bundle id, permission usage strings, URL schemes.</div>
+        </div>
+        <div class="tool">
+          <div class="tool-sig"><span class="tool-tag read">reads</span> get_entitlements<span class="args">(ipa_id)</span></div>
+          <div class="tool-desc">Parsed code-signing entitlements — app groups, keychain access, associated domains.</div>
+        </div>
+      </div>
+
+      <div class="tool-group">
+        <div class="tool-group-title">Code</div>
+        <div class="tool">
+          <div class="tool-sig"><span class="tool-tag read">reads</span> list_classes<span class="args">(ipa_id, query?, limit=50)</span></div>
+          <div class="tool-desc">Search Objective-C classes by name — returns a compact summary per class.</div>
+        </div>
+        <div class="tool">
+          <div class="tool-sig"><span class="tool-tag read">reads</span> get_class<span class="args">(ipa_id, class_name)</span></div>
+          <div class="tool-desc">Full interface: every method (with address), property, ivar offset, and protocol.</div>
+        </div>
+        <div class="tool">
+          <div class="tool-sig"><span class="tool-tag read">reads</span> list_functions<span class="args">(ipa_id, query?, limit=50)</span></div>
+          <div class="tool-desc">Search named functions — every ObjC method plus symbol-table C symbols.</div>
+        </div>
+        <div class="tool">
+          <div class="tool-sig"><span class="tool-tag compute">runs r2 + Ghidra</span> get_function_detail<span class="args">(ipa_id, address, include_assembly=false)</span></div>
+          <div class="tool-desc">The main event: disassembles and decompiles one function on demand, returning Ghidra's pseudo-C, calls made, and direct callers. Cached after the first call.</div>
+        </div>
+      </div>
+    </section>
+
+    <section id="setup-desktop">
+      <h2>Claude Desktop</h2>
+      <div class="client-card">
+        <h3><span class="client-icon" style="background:#d97757;">C</span> claude_desktop_config.json</h3>
+        <ol class="steps">
+          <li>
+            <strong>Open the config file</strong>
+            <span class="file-tag">~/Library/Application Support/Claude/claude_desktop_config.json</span>
+          </li>
+          <li>
+            <strong>Add an <span class="mono">mcpServers</span> key</strong> alongside whatever's already there — don't replace existing keys:
+            <div class="code-wrap">
+              <button class="copy-btn" data-copy-target="cfg-desktop">Copy</button>
+              <pre class="code" id="cfg-desktop">{
+  "mcpServers": {
+    "iosdeob": {
+      "command": "/Users/reachkim/Documents/Codes/iOSDeOb/mcp-server/.venv/bin/python",
+      "args": ["/Users/reachkim/Documents/Codes/iOSDeOb/mcp-server/server.py"]
+    }
+  }
+}</pre>
+            </div>
+          </li>
+          <li>
+            <strong>Quit Claude Desktop fully</strong> (⌘Q, not just close the window) and reopen it.
+          </li>
+        </ol>
+        <div class="callout amber" style="margin-top:16px;">
+          <strong>If nothing shows up:</strong> some Desktop builds register MCP servers
+          through a Settings → Connectors UI instead of reading this file directly.
+          If restarting doesn't surface an "iosdeob" connector, look there and paste
+          the same command + args.
+        </div>
+      </div>
+    </section>
+
+    <section id="setup-code">
+      <h2>Claude Code</h2>
+      <div class="client-card">
+        <h3><span class="client-icon" style="background:#3f63e0;">⌘</span> Project-level .mcp.json</h3>
+        <p class="muted" style="margin-top:0;">Create this file at the root of a project, or merge the key into an existing one:</p>
+        <div class="code-wrap">
+          <span class="file-tag">.mcp.json</span>
+          <button class="copy-btn" data-copy-target="cfg-code">Copy</button>
+          <pre class="code" id="cfg-code">{
+  "mcpServers": {
+    "iosdeob": {
+      "command": "/Users/reachkim/Documents/Codes/iOSDeOb/mcp-server/.venv/bin/python",
+      "args": ["/Users/reachkim/Documents/Codes/iOSDeOb/mcp-server/server.py"]
+    }
+  }
+}</pre>
+        </div>
+      </div>
+      <div class="client-card">
+        <h3><span class="client-icon" style="background:#3f63e0;">›_</span> Or via the CLI</h3>
+        <p class="muted" style="margin-top:0;">Equivalent, without hand-editing JSON:</p>
+        <div class="code-wrap">
+          <button class="copy-btn" data-copy-target="cfg-cli">Copy</button>
+          <pre class="code" id="cfg-cli">claude mcp add iosdeob \
+  /Users/reachkim/Documents/Codes/iOSDeOb/mcp-server/.venv/bin/python \
+  /Users/reachkim/Documents/Codes/iOSDeOb/mcp-server/server.py</pre>
+        </div>
+        <p class="muted">Run <span class="mono">claude mcp list</span> afterward to confirm it registered, and restart the session so the tools load.</p>
+      </div>
+    </section>
+
+    <section id="setup-other">
+      <h2>Other MCP clients</h2>
+      <p class="muted">
+        MCP is an open standard — Cursor, Windsurf, Zed, and others all speak it, and
+        almost every one uses the exact same <span class="mono">command</span> +
+        <span class="mono">args</span> shape, just in their own settings file. Check
+        that client's MCP/tools settings for the file path, then paste in:
+      </p>
+      <div class="code-wrap">
+        <button class="copy-btn" data-copy-target="cfg-generic">Copy</button>
+        <pre class="code" id="cfg-generic">{
+  "iosdeob": {
+    "command": "/Users/reachkim/Documents/Codes/iOSDeOb/mcp-server/.venv/bin/python",
+    "args": ["/Users/reachkim/Documents/Codes/iOSDeOb/mcp-server/server.py"]
+  }
+}</pre>
+      </div>
+      <p class="muted">
+        Some clients want just the inner object (no <span class="mono">mcpServers</span>
+        wrapper) under a server name you choose — the <span class="mono">command</span>/<span class="mono">args</span> pair is what actually matters.
+      </p>
+    </section>
+
+    <section id="examples">
+      <h2>Example prompts</h2>
+      <p class="muted">Once connected, plain language is enough — the tool descriptions tell the model when to reach for each one.</p>
+      <div class="prompt-list">
+        <div class="prompt">Upload ~/Downloads/MyApp.ipa to iosdeob and tell me what permissions it requests and why.</div>
+        <div class="prompt">List classes matching "Login" in that scan, then decompile whatever handles the submit button.</div>
+        <div class="prompt">Check get_entitlements — does this app declare any associated domains or iCloud containers?</div>
+        <div class="prompt">Search functions for "Biometric" and summarize how Face ID login is wired up.</div>
+      </div>
+    </section>
+
+    <section id="troubleshooting">
+      <h2>Troubleshooting</h2>
+      <div class="qa">
+        <div class="q">The client starts but no "iosdeob" tools appear</div>
+        <div class="a">Fully quit and reopen the client — most MCP clients only read config at launch. Then confirm the JSON is valid (a trailing comma is the usual culprit) and that both absolute paths exist on disk.</div>
+      </div>
+      <div class="qa">
+        <div class="q">Every tool call fails immediately</div>
+        <div class="a">The Docker stack probably isn't running. Check <span class="mono">curl http://localhost:8080/api/health</span> — if that doesn't return <span class="mono">ok</span>, run <span class="mono">docker compose up -d</span> from the project root first.</div>
+      </div>
+      <div class="qa">
+        <div class="q">upload_ipa times out on a large file</div>
+        <div class="a">Pass a longer <span class="mono">timeout_seconds</span>, or call it with <span class="mono">wait=false</span> and poll <span class="mono">get_scan_info</span> until status is "ready".</div>
+      </div>
+      <div class="qa">
+        <div class="q">get_function_detail's decompiled_code is empty</div>
+        <div class="a">Check <span class="mono">decompile_error</span> in the same response. The most common cause is an arm64e-only binary — pointer authentication on that slice isn't decoded, so decompilation for functions in it can come back empty even though disassembly still works.</div>
+      </div>
+    </section>
+
+    <section id="security">
+      <h2>Scope &amp; security</h2>
+      <p class="muted">
+        The server only ever calls the API on <span class="mono">localhost</span> — nothing
+        leaves your machine. It performs static analysis exclusively; the uploaded
+        binary is never executed. By design there's no delete tool exposed here, so
+        an agent can add and read scans but can't remove your existing analysis data.
+      </p>
+    </section>
+  </main>
+</div>
+
+<footer>
+  iOSDeOb MCP server · runs from <span class="mono">mcp-server/server.py</span> · talks to the API on <span class="mono">localhost:8080</span>
+</footer>
+
+<script>
+  document.querySelectorAll('.copy-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var targetId = btn.getAttribute('data-copy-target');
+      var el = document.getElementById(targetId);
+      if (!el) return;
+      var text = el.textContent;
+      function done() {
+        var original = btn.textContent;
+        btn.textContent = 'Copied';
+        setTimeout(function () { btn.textContent = original; }, 1400);
+      }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done).catch(function () { fallbackCopy(text, done); });
+      } else {
+        fallbackCopy(text, done);
+      }
+    });
+  });
+
+  function fallbackCopy(text, cb) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); } catch (e) {}
+    document.body.removeChild(ta);
+    cb();
+  }
+</script>

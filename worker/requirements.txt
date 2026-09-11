@@ -1,0 +1,5 @@
+celery==5.4.0
+redis==5.0.8
+requests==2.32.3
+r2pipe==1.9.6
+numpy==2.1.1
