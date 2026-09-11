@@ -4,7 +4,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from ..celery_client import enqueue_dynamic_trace
+from ..celery_client import celery_client as celery_app, enqueue_dynamic_trace
 from ..db import get_db
 from ..models import IPA, Job, PlistRecord, DynamicTrace
 from ..routes.jobs import _require_internal_token
@@ -25,6 +25,16 @@ MAX_DURATION_SECS = 300
 
 def _run_out(job: Job) -> DynamicRunOut:
     config = json.loads(job.dynamic_config_json) if job.dynamic_config_json else None
+    config_out = None
+    if config:
+        config_out = DynamicRunConfigOut(
+            bundle_id=config.get("bundle_id"),
+            classes=config.get("classes", []),
+            trace_network=config.get("trace_network", True),
+            trace_crypto=config.get("trace_crypto", True),
+            duration_secs=config.get("duration_secs", 30),
+            has_custom_script=bool(config.get("custom_script")),
+        )
     return DynamicRunOut(
         id=job.id,
         ipa_id=job.ipa_id,
@@ -35,7 +45,7 @@ def _run_out(job: Job) -> DynamicRunOut:
         stop_requested=job.stop_requested,
         started_at=job.started_at,
         finished_at=job.finished_at,
-        config=DynamicRunConfigOut(**config) if config else None,
+        config=config_out,
     )
 
 
@@ -64,6 +74,7 @@ def start_dynamic_trace(ipa_id: str, body: StartDynamicRequest, db: Session = De
         "trace_network": body.trace_network,
         "trace_crypto": body.trace_crypto,
         "duration_secs": duration_secs,
+        "custom_script": body.custom_script,
     }
 
     job = Job(ipa_id=ipa_id, phase="dynamic", status="queued", dynamic_config_json=json.dumps(config))
@@ -82,7 +93,24 @@ def stop_dynamic_trace(job_id: str, db: Session = Depends(get_db)):
     job = db.get(Job, job_id)
     if not job or job.phase != "dynamic":
         raise HTTPException(404, "Dynamic run not found")
+
     job.stop_requested = True
+
+    if job.status == "queued":
+        # Never picked up by a live frida-bridge runner (e.g. it isn't
+        # running yet) — nothing will ever poll stop_requested, so cancel
+        # outright instead of leaving this stuck "stopping" forever. If a
+        # runner does pick up the underlying task later, runner.run() checks
+        # stop_requested before touching the device and bails immediately.
+        if job.celery_task_id:
+            try:
+                celery_app.control.revoke(job.celery_task_id)
+            except Exception:
+                pass  # best-effort; the stop_requested check below is the real backstop
+        job.status = "failed"
+        job.error_message = "Cancelled before a dynamic-analysis runner picked it up."
+        job.finished_at = datetime.utcnow()
+
     db.commit()
     return _run_out(job)
 

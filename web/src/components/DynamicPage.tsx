@@ -9,16 +9,21 @@ import {
   stopJob,
 } from "../api";
 
-const CATEGORIES = ["objc_call", "network", "keychain", "crypto", "lifecycle", "error"] as const;
+const KNOWN_CATEGORIES = ["objc_call", "network", "keychain", "crypto", "custom", "lifecycle", "error"] as const;
 
 const CATEGORY_LABEL: Record<string, string> = {
   objc_call: "ObjC call",
   network: "Network",
   keychain: "Keychain",
   crypto: "Crypto",
+  custom: "Custom",
   lifecycle: "Lifecycle",
   error: "Error",
 };
+
+function categoryLabel(cat: string): string {
+  return CATEGORY_LABEL[cat] ?? cat;
+}
 
 function isRunning(run: DynamicRun | null): boolean {
   return !!run && (run.status === "queued" || run.status === "running");
@@ -34,7 +39,7 @@ function EventRow({ event }: { event: DynamicTraceEvent }) {
     <div className="dyn-event" onClick={() => setExpanded((v) => !v)}>
       <div className="dyn-event-main">
         <span className="dyn-event-time mono">{formatOffset(event.ts_offset_ms)}</span>
-        <span className={`dyn-badge tone-${event.category}`}>{CATEGORY_LABEL[event.category] ?? event.category}</span>
+        <span className={`dyn-badge tone-${event.category}`}>{categoryLabel(event.category)}</span>
         <span className="dyn-event-summary mono">{event.summary}</span>
       </div>
       {expanded && (
@@ -65,9 +70,16 @@ export default function DynamicPage({
   const [traceNetwork, setTraceNetwork] = useState(true);
   const [traceCrypto, setTraceCrypto] = useState(true);
   const [durationSecs, setDurationSecs] = useState(30);
+  const [customScript, setCustomScript] = useState("");
+  const [customScriptFileName, setCustomScriptFileName] = useState<string | null>(null);
+  const [showScriptEditor, setShowScriptEditor] = useState(false);
 
-  const [categoryFilter, setCategoryFilter] = useState<Set<string>>(new Set(CATEGORIES));
+  // Hidden-categories model (not an allow-list): anything new — including
+  // arbitrary category names a custom script sends — is visible by default.
+  const [hiddenCategories, setHiddenCategories] = useState<Set<string>>(new Set());
   const [eventQuery, setEventQuery] = useState("");
+
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -135,13 +147,19 @@ export default function DynamicPage({
     return classes.filter((c) => c.name.toLowerCase().includes(q));
   }, [classes, classQuery]);
 
+  const presentCategories = useMemo(() => {
+    const seen = new Set<string>(KNOWN_CATEGORIES);
+    events.forEach((e) => seen.add(e.category));
+    return Array.from(seen);
+  }, [events]);
+
   const filteredEvents = useMemo(() => {
     return events.filter((e) => {
-      if (!categoryFilter.has(e.category)) return false;
+      if (hiddenCategories.has(e.category)) return false;
       if (eventQuery.trim() && !e.summary.toLowerCase().includes(eventQuery.toLowerCase())) return false;
       return true;
     });
-  }, [events, categoryFilter, eventQuery]);
+  }, [events, hiddenCategories, eventQuery]);
 
   function toggleClass(name: string) {
     setSelectedClasses((prev) => {
@@ -153,12 +171,28 @@ export default function DynamicPage({
   }
 
   function toggleCategory(cat: string) {
-    setCategoryFilter((prev) => {
+    setHiddenCategories((prev) => {
       const next = new Set(prev);
       if (next.has(cat)) next.delete(cat);
       else next.add(cat);
       return next;
     });
+  }
+
+  function handleScriptFile(file: File) {
+    const reader = new FileReader();
+    reader.onload = () => {
+      setCustomScript(String(reader.result ?? ""));
+      setCustomScriptFileName(file.name);
+      setShowScriptEditor(true);
+    };
+    reader.readAsText(file);
+  }
+
+  function clearScript() {
+    setCustomScript("");
+    setCustomScriptFileName(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
   async function handleStart() {
@@ -171,6 +205,7 @@ export default function DynamicPage({
         trace_network: traceNetwork,
         trace_crypto: traceCrypto,
         duration_secs: durationSecs,
+        custom_script: customScript.trim() || undefined,
       });
       setRuns((prev) => [run, ...prev]);
       setActiveRun(run);
@@ -237,6 +272,53 @@ export default function DynamicPage({
           <span>Trace crypto, keychain &amp; SSL pinning checkpoints</span>
         </label>
 
+        <div className="dyn-field">
+          <span>Custom Frida script (optional)</span>
+          <div className="dyn-script-upload">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".js"
+              id="dyn-script-file"
+              className="dyn-script-file-input"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) handleScriptFile(file);
+              }}
+            />
+            <label htmlFor="dyn-script-file" className="btn btn-secondary dyn-script-upload-btn">
+              📄 Upload .js
+            </label>
+            {customScriptFileName && <span className="dyn-script-filename mono">{customScriptFileName}</span>}
+            {customScript && (
+              <>
+                <button className="btn btn-secondary" onClick={() => setShowScriptEditor((v) => !v)}>
+                  {showScriptEditor ? "Hide" : "Edit"}
+                </button>
+                <button className="btn btn-secondary" onClick={clearScript}>
+                  Clear
+                </button>
+              </>
+            )}
+          </div>
+          <div className="muted dyn-script-hint">
+            Runs alongside the hooks above, in its own script — a syntax error or exception in it won't affect
+            the built-in hooks. Anything it <code className="mono">send()</code>s is logged as a{" "}
+            <code className="mono">custom</code> event below.
+          </div>
+          {(showScriptEditor || (!customScriptFileName && customScript === "")) && (
+            <textarea
+              className="dyn-script-editor mono"
+              placeholder={"// Paste or write a Frida script here, e.g.:\nInterceptor.attach(Module.findGlobalExportByName('SecItemAdd'), {\n  onEnter() { send({ summary: 'SecItemAdd called' }); }\n});"}
+              value={customScript}
+              onChange={(e) => {
+                setCustomScript(e.target.value);
+                if (customScriptFileName) setCustomScriptFileName(null);
+              }}
+            />
+          )}
+        </div>
+
         <label className="dyn-field">
           <span>Duration (seconds, max 300)</span>
           <input
@@ -267,6 +349,7 @@ export default function DynamicPage({
                 >
                   <span className={`pill pill-${run.status}`}>{run.status}</span>
                   <span className="mono dyn-run-bundle">{run.config?.bundle_id ?? "?"}</span>
+                  {run.config?.has_custom_script && <span title="Used a custom script">📄</span>}
                   <span className="muted dyn-run-time">
                     {run.started_at ? new Date(run.started_at).toLocaleTimeString() : "—"}
                   </span>
@@ -300,13 +383,13 @@ export default function DynamicPage({
             {activeRun.error_message && <div className="error-text">{activeRun.error_message}</div>}
 
             <div className="dyn-event-filters">
-              {CATEGORIES.map((cat) => (
+              {presentCategories.map((cat) => (
                 <button
                   key={cat}
-                  className={`dyn-chip tone-${cat} ${categoryFilter.has(cat) ? "active" : ""}`}
+                  className={`dyn-chip tone-${cat} ${!hiddenCategories.has(cat) ? "active" : ""}`}
                   onClick={() => toggleCategory(cat)}
                 >
-                  {CATEGORY_LABEL[cat]}
+                  {categoryLabel(cat)}
                 </button>
               ))}
               <input

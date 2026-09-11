@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+*.egg-info/
+
+# Node
+node_modules/
+package-lock.json.bak
+
+# frida-bridge build artifact — regenerated via `npm run build`, see frida-bridge/README.md
+frida-bridge/agent-bundle.js
+
+# Local env overrides
+.env
+.env.*
+!.env.example
+
+# Editor / OS
+.DS_Store
+.vscode/
+.idea/
+
+# App-generated local state (bind-mounted volumes in docker-compose are named
+# volumes, not host paths, so this is just for stray local runs)
+*.db
+*.db-journal
+*.log

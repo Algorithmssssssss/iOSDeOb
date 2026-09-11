@@ -1,6 +1,14 @@
 // Frida agent injected into the target app for a dynamic-trace run.
 // Purely observational: every hook logs, none of them alter behavior or
 // bypass anything (e.g. SecTrustEvaluate is watched, never faked).
+//
+// This file is a build INPUT, not what actually gets loaded — Frida 17+
+// dropped ObjC as an ambient global, so it must be pulled in via the
+// frida-objc-bridge npm package and bundled with frida-compile (see
+// package.json's "build" script and README.md). runner.py loads the
+// resulting agent-bundle.js.
+
+import ObjC from "frida-objc-bridge";
 
 const START = Date.now();
 
@@ -11,6 +19,42 @@ function emit(category, summary, detail) {
     detail: detail === undefined ? null : detail,
     ts_offset_ms: Date.now() - START,
   });
+}
+
+const MAX_BODY_BYTES = 8192;
+
+// NSData's bytes are read-only here — never touched via HTTPBodyStream,
+// which would consume the stream and break the real request.
+function describeNsData(data) {
+  if (!data || data.isNull()) {
+    return { body_length: 0, body: null };
+  }
+
+  const len = data.length().valueOf();
+  if (len === 0) {
+    return { body_length: 0, body: null };
+  }
+
+  try {
+    const ptr = data.bytes();
+    const readLen = Math.min(len, MAX_BODY_BYTES);
+    const text = Memory.readUtf8String(ptr, readLen);
+    return {
+      body_length: len,
+      body: text,
+      body_truncated: len > MAX_BODY_BYTES,
+    };
+  } catch (e) {
+    return { body_length: len, body: null, body_note: "binary (not valid UTF-8, possibly compressed — check Content-Encoding)" };
+  }
+}
+
+function describeHttpBody(request) {
+  const stream = request.HTTPBodyStream ? request.HTTPBodyStream() : null;
+  if (stream && !stream.isNull()) {
+    return { body_length: null, body: null, body_note: "sent via HTTPBodyStream (not read, to avoid consuming it)" };
+  }
+  return describeNsData(request.HTTPBody ? request.HTTPBody() : null);
 }
 
 function describeObjcArg(value, typeChar) {
@@ -93,14 +137,10 @@ function hookNetwork() {
                 const headers = request.allHTTPHeaderFields() && !request.allHTTPHeaderFields().isNull()
                   ? request.allHTTPHeaderFields().toString()
                   : null;
-                const body = request.HTTPBody();
-                const bodyLen = body && !body.isNull() ? body.length().valueOf() : 0;
-                emit("network", (method || "?") + " " + (url || "?"), {
-                  url: url,
-                  method: method,
-                  headers: headers,
-                  body_length: bodyLen,
-                });
+                emit("network", (method || "?") + " " + (url || "?"), Object.assign(
+                  { url: url, method: method, headers: headers },
+                  describeHttpBody(request)
+                ));
               }
             } catch (e) {
               /* best-effort */
@@ -124,7 +164,10 @@ function hookNetwork() {
               const request = new ObjC.Object(args[2]);
               const url = request.URL() && !request.URL().isNull() ? request.URL().absoluteString().toString() : null;
               const method = request.HTTPMethod() && !request.HTTPMethod().isNull() ? request.HTTPMethod().toString() : null;
-              emit("network", (method || "?") + " " + (url || "?") + " (sync)", { url: url, method: method });
+              emit("network", (method || "?") + " " + (url || "?") + " (sync)", Object.assign(
+                { url: url, method: method },
+                describeHttpBody(request)
+              ));
             } catch (e) {
               /* best-effort */
             }
@@ -134,6 +177,38 @@ function hookNetwork() {
     }
   } catch (e) {
     emit("error", "NSURLConnection hook setup failed", { error: String(e) });
+  }
+
+  // uploadTaskWithRequest:fromData: passes the body as a separate argument
+  // that's never attached to the request object — resume() alone can't see
+  // it, so this is the only way to capture bodies sent this way (a common
+  // pattern for analytics/telemetry SDKs, e.g. Firebase/GA beacons).
+  try {
+    const NSURLSession = ObjC.classes.NSURLSession;
+    if (NSURLSession) {
+      ["- uploadTaskWithRequest:fromData:", "- uploadTaskWithRequest:fromData:completionHandler:"].forEach((sel) => {
+        const method = NSURLSession[sel];
+        if (!method) return;
+        Interceptor.attach(method.implementation, {
+          onEnter(args) {
+            try {
+              const request = new ObjC.Object(args[2]);
+              const data = new ObjC.Object(args[3]);
+              const url = request.URL() && !request.URL().isNull() ? request.URL().absoluteString().toString() : null;
+              const httpMethod = request.HTTPMethod() && !request.HTTPMethod().isNull() ? request.HTTPMethod().toString() : "POST";
+              emit("network", httpMethod + " " + (url || "?") + " (upload)", Object.assign(
+                { url: url, method: httpMethod },
+                describeNsData(data)
+              ));
+            } catch (e) {
+              /* best-effort */
+            }
+          },
+        });
+      });
+    }
+  } catch (e) {
+    emit("error", "uploadTask hook setup failed", { error: String(e) });
   }
 }
 
@@ -150,7 +225,7 @@ function hookCryptoAndKeychain() {
   ];
   targets.forEach(({ name, category }) => {
     try {
-      const addr = Module.findExportByName(null, name);
+      const addr = Module.findGlobalExportByName(name);
       if (!addr) return;
       Interceptor.attach(addr, {
         onEnter(args) {

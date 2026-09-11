@@ -12,6 +12,7 @@
   --green: #4cd07d;
   --amber: #e0b34d;
   --red: #f0616b;
+  --violet: #a78bfa;
   --radius: 8px;
   --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
 }
@@ -760,7 +761,7 @@ body {
 
 .dynamic-page {
   display: grid;
-  grid-template-columns: 320px 1fr;
+  grid-template-columns: 380px 1fr;
   gap: 18px;
   height: 100%;
   min-height: 0;
@@ -787,8 +788,10 @@ body {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--bg-sunken);
-  max-height: 160px;
+  height: 420px;
+  flex-shrink: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 4px 0;
 }
 .dyn-class-row {
@@ -860,6 +863,7 @@ body {
 .dyn-chip.tone-objc_call.active { color: var(--accent); border-color: var(--accent-dim); }
 .dyn-chip.tone-network.active { color: var(--green); border-color: rgba(76, 208, 125, 0.35); }
 .dyn-chip.tone-keychain.active, .dyn-chip.tone-crypto.active { color: var(--amber); border-color: rgba(224, 179, 77, 0.35); }
+.dyn-chip.tone-custom.active { color: var(--violet); border-color: rgba(167, 139, 250, 0.35); }
 .dyn-chip.tone-error.active { color: var(--red); border-color: rgba(240, 97, 107, 0.35); }
 .dyn-chip.tone-lifecycle.active { color: var(--text); }
 .dyn-event-search { flex: 1; min-width: 160px; }
@@ -899,4 +903,49 @@ body {
 .dyn-badge.tone-objc_call { background: rgba(91, 140, 255, 0.12); color: var(--accent); }
 .dyn-badge.tone-network { background: rgba(76, 208, 125, 0.12); color: var(--green); }
 .dyn-badge.tone-keychain, .dyn-badge.tone-crypto { background: rgba(224, 179, 77, 0.12); color: var(--amber); }
+.dyn-badge.tone-custom { background: rgba(167, 139, 250, 0.12); color: var(--violet); }
 .dyn-badge.tone-error { background: rgba(240, 97, 107, 0.12); color: var(--red); }
+
+.dyn-script-upload {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.dyn-script-file-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  overflow: hidden;
+}
+.dyn-script-upload-btn { cursor: pointer; }
+.dyn-script-filename {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 140px;
+}
+.dyn-script-hint { line-height: 1.5; }
+.dyn-script-hint code {
+  background: var(--bg-sunken);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 11px;
+}
+.dyn-script-editor {
+  width: 100%;
+  min-height: 140px;
+  resize: vertical;
+  background: var(--bg-sunken);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.5;
+  padding: 10px;
+}
+.dyn-script-editor:focus { outline: none; border-color: var(--accent-dim); }

@@ -2,6 +2,7 @@
 Frida agent, stream events back to the API, and stop after the configured
 duration or an early stop request."""
 
+import json
 import os
 import threading
 import time
@@ -9,9 +10,9 @@ import time
 import frida
 import requests
 
-API_INTERNAL_URL = os.environ.get("API_INTERNAL_URL", "http://localhost:8001")
+API_INTERNAL_URL = os.environ.get("API_INTERNAL_URL", "http://localhost:8000")
 INTERNAL_TOKEN = os.environ.get("INTERNAL_TOKEN", "dev-internal-token-change-me")
-AGENT_PATH = os.path.join(os.path.dirname(__file__), "..", "agent.js")
+AGENT_PATH = os.path.join(os.path.dirname(__file__), "..", "agent-bundle.js")
 USB_DEVICE_TIMEOUT_SECS = 5
 POLL_INTERVAL_SECS = 1
 
@@ -75,26 +76,72 @@ def _spawn_or_attach(device: "frida.core.Device", bundle_id: str):
 def run(ipa_id: str, job_id: str, params: dict) -> None:
     bundle_id = params["bundle_id"]
     duration_secs = max(1, int(params.get("duration_secs", 30)))
+    custom_script_source = params.get("custom_script") or None
+
+    if _stop_requested(job_id):
+        # Delivered late (e.g. this worker only just started) after the run
+        # was already cancelled — bail before spawning/attaching anything.
+        raise RuntimeError("Run was cancelled before this worker picked it up")
 
     with open(AGENT_PATH) as f:
         agent_source = f.read()
 
     events_lock = threading.Lock()
     pending_events: list[dict] = []
+    run_started = time.time()
 
-    def on_message(message, _data):
+    def add_event(event: dict) -> None:
+        with events_lock:
+            pending_events.append(event)
+
+    def on_main_message(message, _data):
+        # agent-bundle.js always sends well-formed {category, summary,
+        # detail, ts_offset_ms} payloads — this is our own trusted script.
+        if message.get("type") == "error":
+            add_event({
+                "ts_offset_ms": int((time.time() - run_started) * 1000),
+                "category": "error",
+                "summary": "built-in agent error: " + message.get("description", "unknown error"),
+                "detail": {"stack": message.get("stack")},
+            })
+            return
         if message.get("type") != "send":
             return
         payload = message.get("payload")
         if not isinstance(payload, dict):
             return
-        with events_lock:
-            pending_events.append({
-                "ts_offset_ms": payload.get("ts_offset_ms", 0),
-                "category": payload.get("category", "lifecycle"),
-                "summary": payload.get("summary", ""),
-                "detail": payload.get("detail"),
+        add_event({
+            "ts_offset_ms": payload.get("ts_offset_ms", 0),
+            "category": payload.get("category", "lifecycle"),
+            "summary": payload.get("summary", ""),
+            "detail": payload.get("detail"),
+        })
+
+    def on_custom_message(message, _data):
+        # A user-supplied script can be anything copy-pasted from the wild —
+        # it won't know our event shape, so normalize whatever it sends
+        # rather than requiring it to cooperate with our schema.
+        offset = int((time.time() - run_started) * 1000)
+        if message.get("type") == "error":
+            add_event({
+                "ts_offset_ms": offset,
+                "category": "error",
+                "summary": "custom script error: " + message.get("description", "unknown error"),
+                "detail": {"stack": message.get("stack")},
             })
+            return
+        if message.get("type") != "send":
+            return
+        payload = message.get("payload")
+        if isinstance(payload, dict) and "summary" in payload:
+            category = payload.get("category") or "custom"
+            summary = str(payload.get("summary"))
+            detail = payload.get("detail", payload)
+        else:
+            category = "custom"
+            summary = payload if isinstance(payload, str) else json.dumps(payload)[:200]
+            detail = payload
+        add_event({"ts_offset_ms": offset, "category": category, "summary": summary, "detail": detail})
 
     def flush() -> None:
         with events_lock:
@@ -109,8 +156,8 @@ def run(ipa_id: str, job_id: str, params: dict) -> None:
     pid, spawned = _spawn_or_attach(device, bundle_id)
     session = device.attach(pid)
 
-    script = session.create_script(agent_source)
-    script.on("message", on_message)
+    script = session.create_script(agent_source, runtime="v8")
+    script.on("message", on_main_message)
     script.load()
 
     _post_progress(job_id, 20, "Installing hooks…")
@@ -119,6 +166,20 @@ def run(ipa_id: str, job_id: str, params: dict) -> None:
         "trace_network": params.get("trace_network", True),
         "trace_crypto": params.get("trace_crypto", True),
     })
+
+    if custom_script_source:
+        _post_progress(job_id, 25, "Loading custom script…")
+        try:
+            custom_script = session.create_script(custom_script_source, runtime="v8")
+            custom_script.on("message", on_custom_message)
+            custom_script.load()
+        except Exception as exc:
+            add_event({
+                "ts_offset_ms": int((time.time() - run_started) * 1000),
+                "category": "error",
+                "summary": "custom script failed to load",
+                "detail": {"error": str(exc)},
+            })
 
     if spawned:
         device.resume(pid)

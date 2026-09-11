@@ -1,0 +1,15 @@
+{
+  "name": "frida-bridge-agent",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Build step for agent.js — Frida 17+ requires ObjC to be imported from frida-objc-bridge rather than relying on it as an ambient global.",
+  "scripts": {
+    "build": "frida-compile agent.js -o agent-bundle.js"
+  },
+  "dependencies": {
+    "frida-objc-bridge": "^8.0.6"
+  },
+  "devDependencies": {
+    "frida-compile": "^19.0.5"
+  }
+}

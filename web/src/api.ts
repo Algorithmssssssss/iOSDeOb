@@ -297,6 +297,7 @@ export interface DynamicRunConfig {
   trace_network: boolean;
   trace_crypto: boolean;
   duration_secs: number;
+  has_custom_script: boolean;
 }
 
 export interface DynamicRun {
@@ -326,6 +327,7 @@ export interface StartDynamicRequest {
   trace_network: boolean;
   trace_crypto: boolean;
   duration_secs: number;
+  custom_script?: string;
 }
 
 export async function startDynamicTrace(ipaId: string, body: StartDynamicRequest): Promise<DynamicRun> {
