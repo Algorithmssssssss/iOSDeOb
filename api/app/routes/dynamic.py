@@ -2,6 +2,7 @@ import json
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ..celery_client import celery_client as celery_app, enqueue_dynamic_trace
@@ -34,6 +35,7 @@ def _run_out(job: Job) -> DynamicRunOut:
             trace_crypto=config.get("trace_crypto", True),
             duration_secs=config.get("duration_secs", 30),
             has_custom_script=bool(config.get("custom_script")),
+            device_id=config.get("device_id"),
         )
     return DynamicRunOut(
         id=job.id,
@@ -75,6 +77,7 @@ def start_dynamic_trace(ipa_id: str, body: StartDynamicRequest, db: Session = De
         "trace_crypto": body.trace_crypto,
         "duration_secs": duration_secs,
         "custom_script": body.custom_script,
+        "device_id": body.device_id,
     }
 
     job = Job(ipa_id=ipa_id, phase="dynamic", status="queued", dynamic_config_json=json.dumps(config))
@@ -122,6 +125,20 @@ def list_dynamic_runs(ipa_id: str, db: Session = Depends(get_db)):
     return [_run_out(j) for j in jobs]
 
 
+@router.delete("/api/ipas/{ipa_id}/dynamic/runs/{job_id}", status_code=204)
+def delete_dynamic_run(ipa_id: str, job_id: str, db: Session = Depends(get_db)):
+    job = db.get(Job, job_id)
+    if not job or job.phase != "dynamic" or job.ipa_id != ipa_id:
+        raise HTTPException(404, "Dynamic run not found")
+    if job.status in ("queued", "running"):
+        raise HTTPException(400, "Stop the run before deleting it")
+
+    db.query(DynamicTrace).filter(DynamicTrace.job_id == job_id).delete()
+    db.delete(job)
+    db.commit()
+    return None
+
+
 @router.get("/api/ipas/{ipa_id}/dynamic/runs/{job_id}/events", response_model=list[DynamicTraceOut])
 def list_dynamic_events(
     ipa_id: str,
@@ -160,11 +177,14 @@ def internal_dynamic_events(job_id: str, payload: DynamicEventsBatchIn, db: Sess
     if not job:
         raise HTTPException(404, "Job not found")
 
+    # MAX rather than COUNT: the next sequence number must never collide
+    # with one already stored, even if rows were ever deleted/skipped —
+    # COUNT silently assumes a gap-free history, which isn't guaranteed.
     next_seq = (
-        db.query(DynamicTrace)
+        db.query(func.max(DynamicTrace.seq))
         .filter(DynamicTrace.job_id == job_id)
-        .count()
-    )
+        .scalar()
+    ) or 0
     for evt in payload.events:
         next_seq += 1
         db.add(DynamicTrace(

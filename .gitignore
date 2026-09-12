@@ -10,6 +10,8 @@ package-lock.json.bak
 
 # frida-bridge build artifact — regenerated via `npm run build`, see frida-bridge/README.md
 frida-bridge/agent-bundle.js
+# transient per-run compile scratch space for uploaded custom scripts
+frida-bridge/.tmp_custom_scripts/
 
 # Local env overrides
 .env

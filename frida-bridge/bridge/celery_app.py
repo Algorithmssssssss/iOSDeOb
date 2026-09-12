@@ -13,4 +13,6 @@ celery_app.conf.update(
     worker_hijack_root_logger=False,
 )
 
-from . import tasks  # noqa: E402,F401
+from . import device_server, tasks  # noqa: E402,F401
+
+device_server.start_in_background()

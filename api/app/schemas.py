@@ -214,6 +214,7 @@ class StartDynamicRequest(BaseModel):
     trace_crypto: bool = True
     duration_secs: int = 30
     custom_script: Optional[str] = None
+    device_id: Optional[str] = None
 
 
 class DynamicRunConfigOut(BaseModel):
@@ -223,6 +224,7 @@ class DynamicRunConfigOut(BaseModel):
     trace_crypto: bool = True
     duration_secs: int = 30
     has_custom_script: bool = False
+    device_id: Optional[str] = None
 
 
 class DynamicRunOut(BaseModel):

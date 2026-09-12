@@ -31,13 +31,14 @@ authorized to test — see [Responsible use](#responsible-use).
   changed vs. a clean build (spoiler: usually a bundled RASP/app-shielding
   SDK, not the app's own code).
 - **Dynamic analysis (Frida)** — install/run the app on a jailbroken device
-  you control and trace it live: Objective-C method calls on classes you
-  pick, outgoing network requests (URL/method/headers/body), and
-  keychain/CommonCrypto/TLS-trust-evaluation checkpoints — plus **your own
-  custom Frida script**, uploaded through the UI and run alongside the
-  built-in hooks in its own isolated script instance. See
-  [frida-bridge/README.md](frida-bridge/README.md) — this piece runs
-  natively on your Mac, not in Docker (Docker Desktop has no USB
+  you control (pick it from a device dropdown — USB is auto-detected, or add
+  one wirelessly by its `host:port`) and trace it live: Objective-C method
+  calls on classes you pick, outgoing network requests
+  (URL/method/headers/body), and keychain/CommonCrypto/TLS-trust-evaluation
+  checkpoints — plus **your own custom Frida script**, uploaded through the
+  UI and run alongside the built-in hooks in its own isolated script
+  instance. See [frida-bridge/README.md](frida-bridge/README.md) — this
+  piece runs natively on your Mac, not in Docker (Docker Desktop has no USB
   passthrough), and is entirely optional/additive: nothing else in the app
   depends on it.
 - **MCP server** — exposes the same analysis (upload, file tree, classes,
@@ -95,8 +96,8 @@ echo "INTERNAL_TOKEN=$(openssl rand -hex 32)" > .env
 
 Everything above works without this. To trace a running app on a jailbroken
 device you control, set up and run `frida-bridge` per
-[its README](frida-bridge/README.md), then use the "🧬 Dynamic" tab on any
-ready scan.
+[its README](frida-bridge/README.md), then open the "🧬 Dynamic analysis"
+page from the header.
 
 ### MCP server (optional)
 

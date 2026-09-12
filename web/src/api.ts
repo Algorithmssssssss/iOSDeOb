@@ -298,6 +298,7 @@ export interface DynamicRunConfig {
   trace_crypto: boolean;
   duration_secs: number;
   has_custom_script: boolean;
+  device_id?: string | null;
 }
 
 export interface DynamicRun {
@@ -328,6 +329,7 @@ export interface StartDynamicRequest {
   trace_crypto: boolean;
   duration_secs: number;
   custom_script?: string;
+  device_id?: string;
 }
 
 export async function startDynamicTrace(ipaId: string, body: StartDynamicRequest): Promise<DynamicRun> {
@@ -356,7 +358,54 @@ export async function listDynamicEvents(
   return json(await fetch(`${API_BASE}/ipas/${ipaId}/dynamic/runs/${jobId}/events?after_seq=${afterSeq}`));
 }
 
+export async function deleteDynamicRun(ipaId: string, jobId: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/ipas/${ipaId}/dynamic/runs/${jobId}`, { method: "DELETE" });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`${res.status} ${res.statusText}: ${text}`);
+  }
+}
+
 export function jobSocketUrl(jobId: string): string {
   const proto = window.location.protocol === "https:" ? "wss" : "ws";
   return `${proto}://${window.location.host}/ws/jobs/${jobId}`;
+}
+
+// frida-bridge's device-picker server is a separate local process on this
+// same Mac (not part of the docker-compose stack — see frida-bridge/README.md)
+// and is only reachable when it's actually running.
+const DEVICE_SERVER_BASE = "http://localhost:5577";
+
+export interface FridaDevice {
+  id: string;
+  name: string;
+  type: string;
+}
+
+export async function listFridaDevices(): Promise<FridaDevice[]> {
+  const res = await fetch(`${DEVICE_SERVER_BASE}/devices`);
+  const data = await json<{ devices: FridaDevice[] }>(res);
+  return data.devices;
+}
+
+export async function addRemoteDevice(address: string): Promise<FridaDevice> {
+  const res = await fetch(`${DEVICE_SERVER_BASE}/devices/remote`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ address }),
+  });
+  const data = await json<{ device: FridaDevice }>(res);
+  return data.device;
+}
+
+export async function removeRemoteDevice(address: string): Promise<void> {
+  const res = await fetch(`${DEVICE_SERVER_BASE}/devices/remote`, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ address }),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`${res.status} ${res.statusText}: ${text}`);
+  }
 }

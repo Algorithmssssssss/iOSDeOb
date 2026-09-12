@@ -35,7 +35,7 @@ import McpDocsPage from "./components/McpDocsPage";
 import ComparePage from "./components/ComparePage";
 import DynamicPage from "./components/DynamicPage";
 
-type WorkspaceTab = "files" | "classes" | "functions" | "dynamic";
+type WorkspaceTab = "files" | "classes" | "functions";
 
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -65,6 +65,7 @@ export default function App() {
   const [disasmError, setDisasmError] = useState<string | null>(null);
   const [showDocs, setShowDocs] = useState(false);
   const [showCompare, setShowCompare] = useState(false);
+  const [showDynamic, setShowDynamic] = useState(false);
   const [disasmProgress, setDisasmProgress] = useState<Job | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const disasmWsRef = useRef<WebSocket | null>(null);
@@ -307,7 +308,7 @@ export default function App() {
             <div className="app-subtitle">IPA static analysis workbench</div>
           </div>
         </div>
-        {!showDocs && !showCompare && selectedIpa?.status === "ready" && (
+        {!showDocs && !showCompare && !showDynamic && selectedIpa?.status === "ready" && (
           <GlobalSearch
             tree={tree}
             classes={classes}
@@ -322,15 +323,29 @@ export default function App() {
           />
         )}
 
-        {!showDocs && (
+        {!showDocs && !showDynamic && (
           <button
             className="btn btn-secondary"
             onClick={() => {
               setShowCompare((v) => !v);
               setShowDocs(false);
+              setShowDynamic(false);
             }}
           >
             {showCompare ? "← Back to workbench" : "⚖️ Compare scans"}
+          </button>
+        )}
+
+        {!showDocs && !showCompare && (
+          <button
+            className="btn btn-secondary"
+            onClick={() => {
+              setShowDynamic((v) => !v);
+              setShowDocs(false);
+              setShowCompare(false);
+            }}
+          >
+            {showDynamic ? "← Back to workbench" : "🧬 Dynamic analysis"}
           </button>
         )}
 
@@ -339,6 +354,7 @@ export default function App() {
           onClick={() => {
             setShowDocs((v) => !v);
             setShowCompare(false);
+            setShowDynamic(false);
           }}
         >
           {showDocs ? "← Back to workbench" : "🔌 MCP setup"}
@@ -386,14 +402,16 @@ export default function App() {
 
           {showCompare && !showDocs && <ComparePage ipas={ipas} />}
 
-          {!showDocs && !showCompare && !selectedIpaId && (
+          {showDynamic && !showDocs && !showCompare && <DynamicPage ipas={ipas} />}
+
+          {!showDocs && !showCompare && !showDynamic && !selectedIpaId && (
             <div className="empty-state">
               <div className="empty-state-icon">📦</div>
               <div>Upload an .ipa to get started.</div>
             </div>
           )}
 
-          {!showDocs && !showCompare && selectedIpaId && selectedIpa?.status !== "ready" && (
+          {!showDocs && !showCompare && !showDynamic && selectedIpaId && selectedIpa?.status !== "ready" && (
             <div className="job-status">
               <div className="job-status-label">
                 Status: <span className={`pill pill-${selectedIpa?.status ?? job?.status}`}>{selectedIpa?.status ?? job?.status}</span>
@@ -410,7 +428,7 @@ export default function App() {
             </div>
           )}
 
-          {!showDocs && !showCompare && selectedIpaId && selectedIpa?.status === "ready" && (
+          {!showDocs && !showCompare && !showDynamic && selectedIpaId && selectedIpa?.status === "ready" && (
             <>
               <div className="tab-bar">
                 <button className={`tab-btn ${tab === "files" ? "active" : ""}`} onClick={() => setTab("files")}>
@@ -421,9 +439,6 @@ export default function App() {
                 </button>
                 <button className={`tab-btn ${tab === "functions" ? "active" : ""}`} onClick={() => setTab("functions")}>
                   Functions {functions.length > 0 && <span className="tab-count">{functions.length}</span>}
-                </button>
-                <button className={`tab-btn ${tab === "dynamic" ? "active" : ""}`} onClick={() => setTab("dynamic")}>
-                  🧬 Dynamic
                 </button>
               </div>
 
@@ -529,16 +544,6 @@ export default function App() {
                     )}
                   </div>
                 </div>
-              )}
-
-              {tab === "dynamic" && selectedIpaId && (
-                <DynamicPage
-                  ipaId={selectedIpaId}
-                  classes={classes}
-                  bundleIdGuess={
-                    (infoPlist?.parsed as { CFBundleIdentifier?: string } | undefined)?.CFBundleIdentifier ?? null
-                  }
-                />
               )}
             </>
           )}
