@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from "react";
 
-const VENV_PYTHON = "/Users/reachkim/Documents/Codes/iOSDeOb/mcp-server/.venv/bin/python";
-const SERVER_PY = "/Users/reachkim/Documents/Codes/iOSDeOb/mcp-server/server.py";
+const VENV_PYTHON = "/path/to/iOSDeOb/mcp-server/.venv/bin/python";
+const SERVER_PY = "/path/to/iOSDeOb/mcp-server/server.py";
 
 const DESKTOP_CONFIG = `{
   "mcpServers": {
@@ -169,14 +169,14 @@ export default function McpDocsPage() {
               <span className="mono">{`{"status":"ok"}`}</span>.
             </li>
             <li>
-              <strong>The MCP server's virtualenv exists.</strong> It's already set up at{" "}
-              <span className="mono">mcp-server/.venv</span>. If you ever need to recreate it:
+              <strong>The MCP server has a virtualenv set up.</strong> From the project root, one time:
               <CodeBlock text={`cd mcp-server\npython3 -m venv .venv\n.venv/bin/pip install -r requirements.txt`} />
             </li>
           </ol>
           <div className="notice">
-            <strong>The two absolute paths</strong> below don't change between clients — they point at this same
-            venv and script on this machine.
+            <strong>Replace <span className="mono">/path/to/iOSDeOb</span> below</strong> with wherever you actually
+            cloned this repo (run <span className="mono">pwd</span> from the project root to get it) — the same
+            absolute path is used everywhere below, for every client.
           </div>
         </section>
 

@@ -27,9 +27,7 @@ authorized to test — see [Responsible use](#responsible-use).
   plus a global cross-scan search from the header.
 - **Scan comparison** — pick two scans and see exactly what differs: files
   added/removed/resized, classes added/removed/changed, functions
-  added/removed. Built this to pin down what an "obfuscated" build actually
-  changed vs. a clean build (spoiler: usually a bundled RASP/app-shielding
-  SDK, not the app's own code).
+  added/removed.
 - **Dynamic analysis (Frida)** — install/run the app on a jailbroken device
   you control (pick it from a device dropdown — USB is auto-detected, or add
   one wirelessly by its `host:port`) and trace it live: Objective-C method
@@ -37,15 +35,12 @@ authorized to test — see [Responsible use](#responsible-use).
   (URL/method/headers/body), and keychain/CommonCrypto/TLS-trust-evaluation
   checkpoints — plus **your own custom Frida script**, uploaded through the
   UI and run alongside the built-in hooks in its own isolated script
-  instance. See [frida-bridge/README.md](frida-bridge/README.md) — this
-  piece runs natively on your Mac, not in Docker (Docker Desktop has no USB
-  passthrough), and is entirely optional/additive: nothing else in the app
-  depends on it.
+  instance. This piece runs natively on your Mac, not in Docker, and is
+  entirely optional/additive — see [Setting up dynamic analysis](#3-optional-set-up-dynamic-analysis-frida-bridge).
 - **MCP server** — exposes the same analysis (upload, file tree, classes,
   functions, decompiled pseudo-C) as MCP tools, so Claude Code, Claude
   Desktop, or any other MCP client can upload an IPA and reason about what
-  it does. In-app setup docs live behind the "🔌 MCP setup" button once the
-  stack is running. See [mcp-server/](mcp-server/).
+  it does — see [Setting up the MCP server](#4-optional-set-up-the-mcp-server).
 
 ## Architecture
 
@@ -62,51 +57,154 @@ redis                        — Celery broker
 `worker` runs on an internal, egress-free Docker network with a read-only
 root filesystem — it parses untrusted Mach-O data but never executes it.
 
-**`frida-bridge`** (dynamic analysis) is deliberately *not* one of the
-`docker-compose` services — it needs real USB access to a jailbroken device,
-which Docker Desktop for Mac can't pass through to a container. It runs as a
-second, native Celery worker on your host, consuming a separate queue the
-containerized `worker` never listens on. See its own README for setup; if
-you never run it, the rest of the app is unaffected.
+Two more pieces run **outside** Docker, directly on your Mac, and are both
+entirely optional:
 
-## Quickstart
+- **`frida-bridge`** (dynamic analysis) — needs real USB access to a
+  jailbroken device, which Docker Desktop can't pass through to a container.
+  It's a second Celery worker consuming a separate queue the containerized
+  `worker` never listens on.
+- **`mcp-server`** — a plain Python process your MCP client launches
+  directly; it just makes the same HTTP calls to the API that your browser
+  does.
 
-Requirements: Docker Desktop.
+If you never set either of these up, the rest of the app works exactly the
+same.
 
-```bash
-git clone <this-repo-url>
-cd iOSDeOb
-docker compose up -d --build
+## Project layout
+
+```
+api/            FastAPI backend — routes, models, schemas
+worker/         Celery worker that does the actual static analysis (Docker)
+web/            React + TypeScript frontend
+proxy/          Caddy config (the reverse proxy in front of everything)
+frida-bridge/   Dynamic-analysis worker — runs on your host, not in Docker
+mcp-server/     MCP server — also runs on your host
+docker-compose.yml   Defines proxy/web/api/worker/redis
 ```
 
-Open **http://localhost:8080**, upload an `.ipa`, and browse. Only
-non-FairPlay-encrypted binaries work — dev-signed, ad-hoc, or already-decrypted
-builds (see [Known limitations](#known-limitations)).
+## Prerequisites
 
-Set `INTERNAL_TOKEN` in a `.env` file (or your shell environment) before
-first run if you want something other than the default dev token — it's the
-shared secret between `api` and the two workers (`worker` and
-`frida-bridge`) for their internal-only callback endpoints:
+- **[Docker Desktop](https://www.docker.com/products/docker-desktop/)** —
+  required for everything except dynamic analysis and the MCP server.
+- **macOS** — `frida-bridge` (dynamic analysis) specifically needs macOS for
+  USB device access; the rest of the stack is platform-agnostic.
+- **Git**.
+- For dynamic analysis only: **Python 3.10+**, **Node.js + npm**, and a
+  **jailbroken iOS device** with `frida-server` installed on it.
+- For the MCP server only: **Python 3.10+** and an MCP-compatible client
+  (Claude Code, Claude Desktop, Cursor, etc.).
+
+Throughout this guide, `/path/to/iOSDeOb` means wherever you clone this repo
+— run `pwd` from the project root any time you need the real value.
+
+## 1. Get the app running
+
+```bash
+git clone <this-repo-url> iOSDeOb
+cd iOSDeOb
+```
+
+(Optional) set a non-default internal auth token — this is the shared
+secret the API and its background workers use to talk to each other
+internally; the stack works fine with the default, but don't reuse the
+default if this will be reachable by anyone other than you:
 
 ```bash
 echo "INTERNAL_TOKEN=$(openssl rand -hex 32)" > .env
 ```
 
-### Dynamic analysis (optional)
+Build and start everything:
 
-Everything above works without this. To trace a running app on a jailbroken
-device you control, set up and run `frida-bridge` per
-[its README](frida-bridge/README.md), then open the "🧬 Dynamic analysis"
-page from the header.
+```bash
+docker compose up -d --build
+```
 
-### MCP server (optional)
+First build pulls a handful of base images and compiles `radare2`/`r2ghidra`
+in the `worker` image — expect several minutes the first time, and a
+**1.5–3GB `worker` image**, which is normal for bundled RE tooling.
 
-To let an MCP client (Claude Code, Claude Desktop, etc.) drive the same
-analysis: with the stack running, open the "🔌 MCP setup" button in the web
-UI for exact copy-pasteable client config, or see
-[mcp-server/server.py](mcp-server/server.py) directly. It runs on the host
-and talks to the API over `http://localhost:8080/api` — no separate service
-in `docker-compose.yml`.
+## 2. Verify it's up
+
+```bash
+curl http://localhost:8080/api/health
+# {"status":"ok"}
+```
+
+Open **http://localhost:8080** in a browser, upload a test `.ipa` (a
+dev-signed or ad-hoc build — see [Known limitations](#known-limitations) for
+why a straight-from-App-Store one won't work), and confirm it reaches
+`ready` status, then browse its Files/Classes/Functions tabs.
+
+If port `8080` (or `8000`/`6379`, which `api`/`redis` also publish to
+`127.0.0.1`) is already used by something else on your machine, Docker will
+fail to start that service — see
+[Troubleshooting](#troubleshooting).
+
+## 3. (Optional) Set up dynamic analysis (frida-bridge)
+
+Skip this section entirely if you don't need to trace a live app on a
+device — everything above already works without it.
+
+```bash
+cd frida-bridge
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+**Check your device's `frida-server` version first** — the `frida` pin in
+`requirements.txt` must match it exactly, or every real call fails with
+`unable to communicate with remote frida-server; please ensure that major
+versions match`. Check via your jailbreak tweak manager (Sileo/Zebra —
+search "frida") or `frida-server --version` over on-device SSH, then update
+the version pin in `requirements.txt` if it differs before running
+`pip install`.
+
+Confirm the device is visible (run directly in a terminal, not through a
+script — it needs a real TTY):
+
+```bash
+frida-ls-devices
+```
+
+Build the injected agent (needs Node/npm):
+
+```bash
+npm install
+npm run build
+```
+
+Start the worker — leave this running in its own terminal tab:
+
+```bash
+export REDIS_URL=redis://localhost:6379/0
+export API_INTERNAL_URL=http://localhost:8000
+export INTERNAL_TOKEN=dev-internal-token-change-me   # match your .env if you set one
+celery -A bridge.celery_app worker -Q frida --pool=solo --loglevel=INFO
+```
+
+Then open the **"🧬 Dynamic analysis"** page from the app's header. Full
+details — picking/adding devices (including wireless via an SSH tunnel),
+what gets captured, custom scripts, and troubleshooting — are in
+[frida-bridge/README.md](frida-bridge/README.md).
+
+## 4. (Optional) Set up the MCP server
+
+Skip this if you don't use an MCP-compatible AI client.
+
+```bash
+cd mcp-server
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+With the Docker stack running, open the **"🔌 MCP setup"** button in the web
+UI — it generates the exact config block for your client (Claude Desktop,
+Claude Code, or a generic one) with the right absolute paths for your clone
+of this repo already filled in, plus a tool reference and troubleshooting
+tips. Or see [mcp-server/server.py](mcp-server/server.py) directly.
 
 ## Data model / storage
 
@@ -133,6 +231,25 @@ extracted trees around indefinitely.
   native struct layout wrong risks corrupting the traced process.
 - Multi-user auth was deliberately deferred — this is a personal/small-team
   tool right now, not a multi-tenant service.
+
+## Troubleshooting
+
+- **A service fails to start / "port is already allocated"** — something
+  else on your Mac is already using `8080`, `8000`, or `6379`. Find and stop
+  it, or change the host-side port in `docker-compose.yml` (the left side of
+  `"127.0.0.1:8000:8000"` — only the left side is safe to change).
+- **A container was working, then a `docker compose up -d <service>` seems
+  to do nothing** — Compose only recreates a container when it detects a
+  config change; if you edited `docker-compose.yml` and it's not taking
+  effect, force it: `docker compose up -d --force-recreate <service>`.
+- **`frida-bridge` can't reach Redis/the API** — both need to be reachable
+  from your host at `localhost:6379` / `localhost:8000`; confirm with
+  `docker compose ps` that `redis` and `api` show a `127.0.0.1:...->...`
+  port mapping, not just an internal one.
+- **Dynamic analysis / MCP server specific issues** — see the
+  troubleshooting sections in
+  [frida-bridge/README.md](frida-bridge/README.md) and the in-app MCP setup
+  page respectively.
 
 ## Responsible use
 
