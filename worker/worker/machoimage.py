@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 LC_SEGMENT_64 = 0x19
 LC_DYLD_INFO = 0x22
 LC_DYLD_INFO_ONLY = 0x80000022
-LC_DYLD_CHAINED_FIXUPS = 0x34
+LC_DYLD_CHAINED_FIXUPS = 0x34 | 0x80000000  # LC_REQ_DYLD — always set by ld64 on this command
 LC_SYMTAB = 0x2
 
 BIND_OPCODE_MASK = 0xF0

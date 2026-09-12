@@ -114,6 +114,8 @@ export interface DisasmResult {
   ops: DisasmOp[];
   calls_out: CallOut[];
   callers_in: CallerIn[];
+  decompiled_code?: string | null;
+  decompile_error?: string | null;
 }
 
 export interface DisasmRequestResult {
