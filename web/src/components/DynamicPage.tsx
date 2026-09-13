@@ -569,9 +569,17 @@ export default function DynamicPage({ ipas }: { ipas: IPA[] }) {
       </div>
 
       <div className="dynamic-results-panel">
-        {!selectedIpaId && <div className="empty-hint">Pick a scan on the left to get started.</div>}
+        {!selectedIpaId && (
+          <div className="empty-state">
+            <div className="empty-state-icon">🧬</div>
+            <div>Pick a scan on the left to get started.</div>
+          </div>
+        )}
         {selectedIpaId && !activeRun && (
-          <div className="empty-hint">Configure and start a trace to see live results here.</div>
+          <div className="empty-state">
+            <div className="empty-state-icon">▶</div>
+            <div>Configure and start a trace to see live results here.</div>
+          </div>
         )}
 
         {selectedIpaId && activeRun && (

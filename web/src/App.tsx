@@ -57,7 +57,15 @@ export default function App() {
               onIpasChanged={refreshIpas}
             />
           )}
-          {view === "compare" && <ComparePage ipas={ipas} />}
+          {view === "compare" && (
+            <ComparePage
+              ipas={ipas}
+              onJumpToScan={(id) => {
+                setSelectedIpaId(id);
+                setView("workbench");
+              }}
+            />
+          )}
           {view === "dynamic" && <DynamicPage ipas={ipas} />}
           {view === "docs" && <McpDocsPage />}
         </div>

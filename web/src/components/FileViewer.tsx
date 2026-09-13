@@ -30,7 +30,12 @@ export default function FileViewer({
         </a>
       </div>
 
-      {preview.kind === "empty" && <div className="empty-hint">Empty file (0 bytes).</div>}
+      {preview.kind === "empty" && (
+        <div className="empty-state">
+          <div className="empty-state-icon">📭</div>
+          <div>Empty file (0 bytes).</div>
+        </div>
+      )}
 
       {preview.kind === "plist" && (
         <pre className="code-block">{JSON.stringify(preview.parsed, null, 2)}</pre>

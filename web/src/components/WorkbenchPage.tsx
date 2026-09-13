@@ -389,7 +389,10 @@ export default function WorkbenchPage({
                 <div className="panel detail-panel">
                   {!selectedNode && infoPlist && <PlistViewer title="Info.plist" data={infoPlist.parsed} />}
                   {!selectedNode && !infoPlist && (
-                    <div className="empty-hint">Select a file in the tree to inspect it.</div>
+                    <div className="empty-state">
+                      <div className="empty-state-icon">📄</div>
+                      <div>Select a file in the tree to inspect it.</div>
+                    </div>
                   )}
                   {!selectedNode && entitlements && (
                     <PlistViewer title="Entitlements" data={entitlements.parsed} />
@@ -443,10 +446,13 @@ export default function WorkbenchPage({
                   {selectedClass ? (
                     <ClassHeaderView cls={selectedClass} onJumpToAddress={jumpToAddress} />
                   ) : (
-                    <div className="empty-hint">
-                      {classes.length === 0
-                        ? "No Objective-C classes found (Swift-only binary, or a binary this parser couldn't read)."
-                        : "Select a class to view its interface."}
+                    <div className="empty-state">
+                      <div className="empty-state-icon">{classes.length === 0 ? "🚫" : "🏛️"}</div>
+                      <div>
+                        {classes.length === 0
+                          ? "No Objective-C classes found (Swift-only binary, or a binary this parser couldn't read)."
+                          : "Select a class to view its interface."}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -464,7 +470,10 @@ export default function WorkbenchPage({
                 </div>
                 <div className="panel detail-panel">
                   {selectedFunctionAddress == null && (
-                    <div className="empty-hint">Select a function to disassemble it.</div>
+                    <div className="empty-state">
+                      <div className="empty-state-icon">ƒ</div>
+                      <div>Select a function to disassemble it.</div>
+                    </div>
                   )}
                   {selectedFunctionAddress != null && disasmLoading && (
                     <div className="job-status">

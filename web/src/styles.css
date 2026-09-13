@@ -316,6 +316,10 @@ body {
 .empty-state-icon { font-size: 40px; opacity: 0.5; }
 .empty-hint { color: var(--text-muted); padding: 20px; font-size: 13px; }
 
+/* Nested inside a content block (e.g. FileViewer) rather than filling a whole
+   panel, so it can't rely on height:100% to center itself. */
+.file-viewer .empty-state { height: auto; padding: 40px 0; }
+
 .job-status { max-width: 480px; margin: 40px auto; text-align: center; }
 .job-status-label { font-size: 13px; margin-bottom: 10px; }
 .job-message { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
@@ -542,6 +546,18 @@ body {
 }
 .notice.small { font-size: 11px; padding: 6px 8px; }
 .empty-hint.small { padding: 8px 0; font-size: 11.5px; }
+
+/* .empty-hint.small has no horizontal padding of its own — it's meant to sit
+   flush with whatever indent its container already provides (e.g. the
+   scan-sidebar's own padding). These containers don't provide one, so the
+   text otherwise sits flush against the box edge instead of lining up with
+   the rows around it. */
+.diff-col-list .empty-hint.small,
+.dyn-class-list .empty-hint.small,
+.dyn-event-list .empty-hint.small,
+.xref-col .empty-hint.small {
+  padding: 8px 12px;
+}
 
 .image-preview {
   background: var(--bg-sunken);
@@ -858,15 +874,18 @@ body {
   padding: 6px 12px;
   font-size: 12px;
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: 10px;
   border-bottom: 1px solid var(--bg-sunken);
 }
 .diff-row:last-child { border-bottom: none; }
 .diff-row-main {
-  overflow-wrap: anywhere;
-  word-break: break-word;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  flex: 1;
   color: var(--text);
 }
 .diff-row-meta {
@@ -876,14 +895,34 @@ body {
   flex-shrink: 0;
   white-space: nowrap;
 }
+.diff-row-jumps {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.diff-jump-btn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-size: 10.5px;
+  padding: 2px 6px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.diff-jump-btn:hover {
+  color: var(--accent);
+  border-color: var(--accent-dim);
+  background: var(--accent-soft);
+}
 
 .dynamic-page {
   display: grid;
   grid-template-columns: 380px 1fr;
-  gap: 18px;
+  gap: var(--sp-5);
   height: 100%;
   min-height: 0;
-  padding: 20px 24px;
+  padding: var(--sp-5) var(--sp-6);
 }
 @media (max-width: 900px) {
   .dynamic-page { grid-template-columns: 1fr; height: auto; }
@@ -893,14 +932,14 @@ body {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--bg-raised);
-  padding: 14px;
+  padding: var(--sp-4);
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--sp-3);
 }
 
-.dyn-field { display: flex; flex-direction: column; gap: 5px; font-size: 12px; color: var(--text-muted); }
+.dyn-field { display: flex; flex-direction: column; gap: 5px; font-size: var(--fs-body); color: var(--text-muted); }
 .dyn-field .search-input { width: 100%; }
 .dyn-field .compare-select { width: 100%; max-width: none; }
 
@@ -919,7 +958,7 @@ body {
   align-items: center;
   gap: 8px;
   padding: 5px 10px;
-  font-size: 12px;
+  font-size: var(--fs-body);
   cursor: pointer;
 }
 .dyn-class-row:hover { background: rgba(255, 255, 255, 0.05); }
@@ -928,7 +967,7 @@ body {
   display: flex;
   align-items: flex-start;
   gap: 8px;
-  font-size: 12px;
+  font-size: var(--fs-body);
   color: var(--text);
   cursor: pointer;
 }
@@ -941,9 +980,9 @@ body {
   align-items: center;
   gap: 8px;
   padding: 6px 8px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
-  font-size: 11.5px;
+  font-size: var(--fs-caption);
 }
 .dyn-run-row:hover { background: rgba(255, 255, 255, 0.05); }
 .dyn-run-row.selected { background: rgba(91, 140, 255, 0.16); }
@@ -961,7 +1000,7 @@ body {
 }
 
 .dyn-run-header { display: flex; align-items: center; gap: 10px; }
-.dyn-run-message { font-size: 12px; }
+.dyn-run-message { font-size: var(--fs-body); }
 
 .dyn-event-filters {
   display: flex;
@@ -970,8 +1009,8 @@ body {
   flex-wrap: wrap;
 }
 .dyn-chip {
-  font-family: -apple-system, sans-serif;
-  font-size: 11px;
+  font-family: var(--sans);
+  font-size: var(--fs-micro);
   font-weight: 600;
   padding: 4px 10px;
   border-radius: 999px;
@@ -1001,12 +1040,12 @@ body {
   padding: 7px 12px;
   border-bottom: 1px solid var(--bg-sunken);
   cursor: pointer;
-  font-size: 12px;
+  font-size: var(--fs-body);
 }
 .dyn-event:last-child { border-bottom: none; }
 .dyn-event:hover { background: rgba(255, 255, 255, 0.04); }
 .dyn-event-main { display: flex; align-items: baseline; gap: 8px; }
-.dyn-event-time { color: var(--text-muted); font-size: 11px; flex-shrink: 0; width: 56px; }
+.dyn-event-time { color: var(--text-muted); font-size: var(--fs-micro); flex-shrink: 0; width: 56px; }
 .dyn-event-summary { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
 .dyn-event-detail { margin: 8px 0 0; font-size: 11px; }
 

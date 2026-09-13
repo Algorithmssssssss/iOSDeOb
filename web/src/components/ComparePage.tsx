@@ -21,6 +21,11 @@ formatDelta.bytes = (n: number) => {
   return `${(n / (1024 * 1024)).toFixed(1)} MB`;
 };
 
+interface JumpTarget {
+  label: string;
+  ipaId: string;
+}
+
 function DiffColumn<T>({
   title,
   count,
@@ -28,6 +33,8 @@ function DiffColumn<T>({
   items,
   filterText,
   renderRow,
+  jumpTargets,
+  onJump,
 }: {
   title: string;
   count: number;
@@ -35,6 +42,8 @@ function DiffColumn<T>({
   items: T[];
   filterText: (item: T) => string;
   renderRow: (item: T) => React.ReactNode;
+  jumpTargets?: (item: T) => JumpTarget[];
+  onJump?: (ipaId: string) => void;
 }) {
   const [query, setQuery] = useState("");
   const filtered = useMemo(() => {
@@ -57,6 +66,20 @@ function DiffColumn<T>({
         {filtered.map((item, i) => (
           <div key={i} className="diff-row">
             {renderRow(item)}
+            {jumpTargets && onJump && (
+              <span className="diff-row-jumps">
+                {jumpTargets(item).map((t) => (
+                  <button
+                    key={t.ipaId}
+                    className="diff-jump-btn"
+                    title={`Open in Workbench · ${t.label}`}
+                    onClick={() => onJump(t.ipaId)}
+                  >
+                    {t.label} ↗
+                  </button>
+                ))}
+              </span>
+            )}
           </div>
         ))}
       </div>
@@ -64,7 +87,13 @@ function DiffColumn<T>({
   );
 }
 
-export default function ComparePage({ ipas }: { ipas: IPA[] }) {
+export default function ComparePage({
+  ipas,
+  onJumpToScan,
+}: {
+  ipas: IPA[];
+  onJumpToScan: (ipaId: string) => void;
+}) {
   const readyIpas = useMemo(() => ipas.filter((ipa) => ipa.status === "ready"), [ipas]);
   const [aId, setAId] = useState("");
   const [bId, setBId] = useState("");
@@ -140,10 +169,12 @@ export default function ComparePage({ ipas }: { ipas: IPA[] }) {
                 filterText={(f: FileEntry) => f.path}
                 renderRow={(f: FileEntry) => (
                   <>
-                    <span className="diff-row-main mono">{f.path}</span>
+                    <span className="diff-row-main mono" title={f.path}>{f.path}</span>
                     {f.kind === "file" && <span className="diff-row-meta">{formatSize(f.size_bytes)}</span>}
                   </>
                 )}
+                jumpTargets={() => [{ label: "A", ipaId: result.a.id }]}
+                onJump={onJumpToScan}
               />
               <DiffColumn
                 title="Only in B"
@@ -153,10 +184,12 @@ export default function ComparePage({ ipas }: { ipas: IPA[] }) {
                 filterText={(f: FileEntry) => f.path}
                 renderRow={(f: FileEntry) => (
                   <>
-                    <span className="diff-row-main mono">{f.path}</span>
+                    <span className="diff-row-main mono" title={f.path}>{f.path}</span>
                     {f.kind === "file" && <span className="diff-row-meta">{formatSize(f.size_bytes)}</span>}
                   </>
                 )}
+                jumpTargets={() => [{ label: "B", ipaId: result.b.id }]}
+                onJump={onJumpToScan}
               />
               <DiffColumn
                 title="Changed size"
@@ -166,10 +199,15 @@ export default function ComparePage({ ipas }: { ipas: IPA[] }) {
                 filterText={(f: FileChanged) => f.path}
                 renderRow={(f: FileChanged) => (
                   <>
-                    <span className="diff-row-main mono">{f.path}</span>
+                    <span className="diff-row-main mono" title={f.path}>{f.path}</span>
                     <span className="diff-row-meta">{formatDelta(f.size_a, f.size_b)}</span>
                   </>
                 )}
+                jumpTargets={() => [
+                  { label: "A", ipaId: result.a.id },
+                  { label: "B", ipaId: result.b.id },
+                ]}
+                onJump={onJumpToScan}
               />
             </div>
           </section>
@@ -187,10 +225,12 @@ export default function ComparePage({ ipas }: { ipas: IPA[] }) {
                 filterText={(c: ClassSummary) => c.name}
                 renderRow={(c: ClassSummary) => (
                   <>
-                    <span className="diff-row-main mono">{c.name}</span>
+                    <span className="diff-row-main mono" title={c.name}>{c.name}</span>
                     <span className="diff-row-meta">{c.superclass}</span>
                   </>
                 )}
+                jumpTargets={() => [{ label: "A", ipaId: result.a.id }]}
+                onJump={onJumpToScan}
               />
               <DiffColumn
                 title="Only in B"
@@ -200,10 +240,12 @@ export default function ComparePage({ ipas }: { ipas: IPA[] }) {
                 filterText={(c: ClassSummary) => c.name}
                 renderRow={(c: ClassSummary) => (
                   <>
-                    <span className="diff-row-main mono">{c.name}</span>
+                    <span className="diff-row-main mono" title={c.name}>{c.name}</span>
                     <span className="diff-row-meta">{c.superclass}</span>
                   </>
                 )}
+                jumpTargets={() => [{ label: "B", ipaId: result.b.id }]}
+                onJump={onJumpToScan}
               />
               <DiffColumn
                 title="Changed"
@@ -213,12 +255,17 @@ export default function ComparePage({ ipas }: { ipas: IPA[] }) {
                 filterText={(c: ClassChanged) => c.name}
                 renderRow={(c: ClassChanged) => (
                   <>
-                    <span className="diff-row-main mono">{c.name}</span>
+                    <span className="diff-row-main mono" title={c.name}>{c.name}</span>
                     <span className="diff-row-meta">
                       {c.a.instance_method_count}→{c.b.instance_method_count} methods
                     </span>
                   </>
                 )}
+                jumpTargets={() => [
+                  { label: "A", ipaId: result.a.id },
+                  { label: "B", ipaId: result.b.id },
+                ]}
+                onJump={onJumpToScan}
               />
             </div>
           </section>
@@ -234,7 +281,9 @@ export default function ComparePage({ ipas }: { ipas: IPA[] }) {
                 tone="a"
                 items={result.functions.only_in_a}
                 filterText={(n: string) => n}
-                renderRow={(n: string) => <span className="diff-row-main mono">{n}</span>}
+                renderRow={(n: string) => <span className="diff-row-main mono" title={n}>{n}</span>}
+                jumpTargets={() => [{ label: "A", ipaId: result.a.id }]}
+                onJump={onJumpToScan}
               />
               <DiffColumn
                 title="Only in B"
@@ -242,7 +291,9 @@ export default function ComparePage({ ipas }: { ipas: IPA[] }) {
                 tone="b"
                 items={result.functions.only_in_b}
                 filterText={(n: string) => n}
-                renderRow={(n: string) => <span className="diff-row-main mono">{n}</span>}
+                renderRow={(n: string) => <span className="diff-row-main mono" title={n}>{n}</span>}
+                jumpTargets={() => [{ label: "B", ipaId: result.b.id }]}
+                onJump={onJumpToScan}
               />
             </div>
           </section>
