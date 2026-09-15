@@ -1,0 +1,85 @@
+networks:
+  frontend-net:
+  backend-net:
+    internal: true
+
+volumes:
+  uploads:
+  extract-scratch:
+  sqlite-data:
+  binaries:
+
+services:
+  proxy:
+    image: caddy:2-alpine
+    depends_on:
+      - web
+      - api
+    ports:
+      - "8080:80"
+    volumes:
+      - ./proxy/Caddyfile:/etc/caddy/Caddyfile:ro
+    networks:
+      - frontend-net
+
+  web:
+    image: algorithmss/iosdeob-web:latest
+    networks:
+      - frontend-net
+    environment:
+      - VITE_API_BASE=/api
+    volumes:
+      - ./web:/app
+      - /app/node_modules
+
+  api:
+    image: algorithmss/iosdeob-api:latest
+    ports:
+      - "127.0.0.1:8000:8000"
+    networks:
+      - frontend-net
+      - backend-net
+    depends_on:
+      - redis
+    environment:
+      - DATABASE_PATH=/data/app.db
+      - UPLOADS_DIR=/uploads
+      - REDIS_URL=redis://redis:6379/0
+      - INTERNAL_TOKEN=${INTERNAL_TOKEN:-dev-internal-token-change-me}
+    volumes:
+      - sqlite-data:/data
+      - uploads:/uploads
+
+  worker:
+    image: algorithmss/iosdeob-worker:latest
+    networks:
+      - backend-net
+    depends_on:
+      - redis
+    read_only: true
+    tmpfs:
+      - /work:size=2g
+      - /tmp:size=512m
+    environment:
+      - UPLOADS_DIR=/uploads
+      - EXTRACT_DIR=/work
+      - BINARIES_DIR=/binaries
+      - REDIS_URL=redis://redis:6379/0
+      - API_INTERNAL_URL=http://api:8000
+      - INTERNAL_TOKEN=${INTERNAL_TOKEN:-dev-internal-token-change-me}
+    volumes:
+      - uploads:/uploads:ro
+      - binaries:/binaries
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 4g
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "127.0.0.1:6379:6379"
+    networks:
+      - frontend-net
+      - backend-net

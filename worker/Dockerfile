@@ -3,11 +3,14 @@ FROM python:3.12-slim
 ENV HOME=/tmp
 WORKDIR /app
 
-# Pinned radare2 release (Debian's packaged version is stale) — arm64 build,
-# matches the Apple Silicon host this runs on. Only depends on libc6.
+# Pinned radare2 release (Debian's packaged version is stale). radare2
+# publishes its .deb releases per-arch as amd64/arm64, which matches
+# Docker's own TARGETARCH naming — so this picks the right one whether
+# building on Apple Silicon (arm64) or a Linux amd64 host/CI runner.
+ARG TARGETARCH
 ARG R2_VERSION=6.2.2
 RUN apt-get update && apt-get install -y --no-install-recommends curl && \
-    curl -sL -o /tmp/radare2.deb "https://github.com/radareorg/radare2/releases/download/${R2_VERSION}/radare2_${R2_VERSION}_arm64.deb" && \
+    curl -sL -o /tmp/radare2.deb "https://github.com/radareorg/radare2/releases/download/${R2_VERSION}/radare2_${R2_VERSION}_${TARGETARCH}.deb" && \
     apt-get install -y --no-install-recommends /tmp/radare2.deb && \
     rm /tmp/radare2.deb && \
     apt-get purge -y curl && apt-get autoremove -y && \
@@ -24,7 +27,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl && \
 # to r2's own system plugin dir instead, which is a normal image layer.
 RUN apt-get update && apt-get install -y --no-install-recommends \
         git build-essential cmake pkg-config unzip curl ca-certificates && \
-    curl -sL -o /tmp/radare2-dev.deb "https://github.com/radareorg/radare2/releases/download/${R2_VERSION}/radare2-dev_${R2_VERSION}_arm64.deb" && \
+    curl -sL -o /tmp/radare2-dev.deb "https://github.com/radareorg/radare2/releases/download/${R2_VERSION}/radare2-dev_${R2_VERSION}_${TARGETARCH}.deb" && \
     apt-get install -y --no-install-recommends /tmp/radare2-dev.deb && \
     rm /tmp/radare2-dev.deb && \
     HOME=/root r2pm -U && \
